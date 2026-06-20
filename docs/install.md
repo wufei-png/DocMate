@@ -18,8 +18,12 @@ bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --update-mode a
 Install from a local clone by scanning a repository prefix directory:
 
 ```bash
-bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix
+bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix --scan-depth 2
 ```
+
+Auto scan defaults to depth `2`. In interactive installs, the installer asks for
+the scan depth after the prefix directory; for scripts, use `--scan-depth N` or
+`DOCMATE_SCAN_MAX_DEPTH=N`.
 
 Use `--update-mode ask`, `--update-mode auto`, or `--update-mode off` to choose
 whether documentation repair asks before editing, opens PRs/MRs automatically

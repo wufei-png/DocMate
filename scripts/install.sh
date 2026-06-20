@@ -16,7 +16,11 @@ DOCMATE_REPO="${DOCMATE_REPO:-wufei-png/DocMate}"
 DOCMATE_BRANCH="${DOCMATE_BRANCH:-main}"
 REMOTE_RAW_BASE_URL="https://raw.githubusercontent.com/${DOCMATE_REPO}/${DOCMATE_BRANCH}"
 DOCMATE_USE_LOCAL_CACHE="${DOCMATE_USE_LOCAL_CACHE:-auto}"
-SCAN_MAX_DEPTH="${DOCMATE_SCAN_MAX_DEPTH:-5}"
+SCAN_MAX_DEPTH="${DOCMATE_SCAN_MAX_DEPTH:-2}"
+SCAN_DEPTH_CONFIGURED=0
+if [ -n "${DOCMATE_SCAN_MAX_DEPTH:-}" ]; then
+  SCAN_DEPTH_CONFIGURED=1
+fi
 
 YES=0
 HOSTS_RAW=""
@@ -38,8 +42,8 @@ fi
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  install.sh [--yes] --repo PATH [--repo PATH ...] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
-  install.sh [--yes] --auto-scan --scan-root PATH [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
+  install.sh [--yes] --repo PATH [--repo PATH ...] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off] [--scan-depth N]
+  install.sh [--yes] --auto-scan --scan-root PATH [--scan-depth N] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
   install.sh
 
 Pipe install:
@@ -56,6 +60,7 @@ while [ "$#" -gt 0 ]; do
     --repo|--project) REPO_ARGS+=("${2:-}"); shift 2 ;;
     --auto-scan) AUTO_SCAN=1; shift ;;
     --scan-root) SCAN_ROOT="${2:-}"; shift 2 ;;
+    --scan-depth) SCAN_MAX_DEPTH="${2:-}"; SCAN_DEPTH_CONFIGURED=1; shift 2 ;;
     --install-mode) INSTALL_MODE="${2:-}"; shift 2 ;;
     --hosts) HOSTS_RAW="${2:-}"; HOSTS_ARG_SET=1; shift 2 ;;
     --existing) EXISTING="${2:-}"; shift 2 ;;
@@ -68,6 +73,7 @@ done
 case "$EXISTING" in backup|skip|overwrite) ;; *) usage ;; esac
 case "$INSTALL_MODE" in ""|global|single|custom) ;; *) usage ;; esac
 case "$UPDATE_MODE" in ask|auto|off) ;; *) usage ;; esac
+case "$SCAN_MAX_DEPTH" in ""|*[!0-9]*|0) usage ;; esac
 
 SUPPORTED_HOSTS=(openclaw claude-code opencode codex hermes)
 HOSTS=()
@@ -965,10 +971,32 @@ collect_manual_repos() {
   done
 }
 
+select_scan_depth_interactive() {
+  local depth=""
+
+  while true; do
+    read_user_line "Repository scan depth [default: $SCAN_MAX_DEPTH]: "
+    depth="$REPLY"
+    if [ -z "$depth" ]; then
+      return
+    fi
+    case "$depth" in
+      *[!0-9]*|0)
+        echo "Invalid scan depth. Please enter a positive integer."
+        ;;
+      *)
+        SCAN_MAX_DEPTH="$depth"
+        return
+        ;;
+    esac
+  done
+}
+
 collect_auto_scan_repos() {
   local scan_root="$SCAN_ROOT"
   local candidate=""
   local candidates=()
+  local depth_selected=0
 
   while true; do
     if [ -z "$scan_root" ]; then
@@ -994,10 +1022,15 @@ collect_auto_scan_repos() {
     fi
 
     echo "Repository prefix directory: $scan_root"
-    if [ "$YES" -eq 1 ] || confirm_yes_no "Scan this prefix for git repositories?" "yes"; then
+    if [ "$YES" -ne 1 ] && [ "$SCAN_DEPTH_CONFIGURED" -ne 1 ] && [ "$depth_selected" -eq 0 ]; then
+      select_scan_depth_interactive
+      depth_selected=1
+    fi
+    if [ "$YES" -eq 1 ] || confirm_yes_no "Scan this prefix for git repositories with max depth $SCAN_MAX_DEPTH?" "yes"; then
       break
     fi
     scan_root=""
+    depth_selected=0
   done
 
   echo "Scanning for git repositories under $scan_root (max depth: $SCAN_MAX_DEPTH)..."

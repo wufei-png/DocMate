@@ -407,6 +407,8 @@ def test_installer_auto_scan_adds_detected_repositories(tmp_path):
             "--auto-scan",
             "--scan-root",
             str(scan_root),
+            "--scan-depth",
+            "3",
             "--hosts",
             "all",
             "--existing",
@@ -419,6 +421,41 @@ def test_installer_auto_scan_adds_detected_repositories(tmp_path):
         (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
     )
     assert {repo["path"] for repo in catalog["repos"]} == {str(repo_a), str(repo_b)}
+
+
+def test_installer_auto_scan_default_depth_is_two(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    scan_root = tmp_path / "scan-root"
+    shallow_repo = scan_root / "docs-a"
+    deep_repo = scan_root / "team-b" / "docs-b"
+    shallow_repo.mkdir(parents=True)
+    deep_repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=shallow_repo, check=True)
+    subprocess.run(["git", "init", "-q"], cwd=deep_repo, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--auto-scan",
+            "--scan-root",
+            str(scan_root),
+            "--hosts",
+            "codex",
+            "--existing",
+            "backup",
+        ],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "max depth: 2" in result.stdout
+    catalog = json.loads(
+        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
+    )
+    assert [repo["path"] for repo in catalog["repos"]] == [str(shallow_repo)]
 
 
 def test_installer_falls_back_to_scanning_when_repo_arg_is_prefix_directory(tmp_path):

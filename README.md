@@ -37,8 +37,12 @@ bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --update-mode a
 Non-interactive install with repository auto scan:
 
 ```bash
-bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix
+bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix --scan-depth 2
 ```
+
+Auto scan defaults to depth `2`. In interactive installs, the installer asks for
+the scan depth after the prefix directory; for scripts, use `--scan-depth N` or
+`DOCMATE_SCAN_MAX_DEPTH=N`.
 
 Install target modes:
 
