@@ -3,8 +3,13 @@ set -euo pipefail
 
 SKILL_SLUG="docmate"
 SCHEMA_VERSION=2
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd -P || pwd -P)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd -P || pwd -P)"
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+SCRIPT_DIR=""
+ROOT_DIR=""
+if [ -n "$SCRIPT_SOURCE" ] && [ -f "$SCRIPT_SOURCE" ]; then
+  SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" 2>/dev/null && pwd -P || pwd -P)"
+  ROOT_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd -P || pwd -P)"
+fi
 CANONICAL_DIR="$HOME/.agents/skills/$SKILL_SLUG"
 
 DOCMATE_REPO="${DOCMATE_REPO:-wufei-png/DocMate}"
@@ -81,6 +86,11 @@ can_prompt() {
 
 should_use_local_file() {
   local rel_path="$1"
+
+  if [ -z "$ROOT_DIR" ]; then
+    return 1
+  fi
+
   case "$DOCMATE_USE_LOCAL_CACHE" in
     0|false|FALSE|False|no|NO|off|OFF) return 1 ;;
     auto|1|true|TRUE|True|yes|YES|on|ON)
@@ -235,14 +245,22 @@ read_user_line() {
 
   if [ "$TTY_AVAILABLE" -eq 1 ]; then
     printf "%s" "$prompt" >&$TTY_FD
-    IFS= read -r REPLY <&$TTY_FD || REPLY=""
-    return
+    if IFS= read -r REPLY <&$TTY_FD; then
+      return
+    fi
+    REPLY=""
+    echo "Error: interactive input is unavailable. Re-run with --repo PATH or --auto-scan --scan-root PATH." >&2
+    exit 1
   fi
 
   if [ -t 0 ]; then
     printf "%s" "$prompt"
-    IFS= read -r REPLY || REPLY=""
-    return
+    if IFS= read -r REPLY; then
+      return
+    fi
+    REPLY=""
+    echo "Error: interactive input is unavailable. Re-run with --repo PATH or --auto-scan --scan-root PATH." >&2
+    exit 1
   fi
 
   echo "Error: interactive input is unavailable. Re-run with --repo PATH or --auto-scan --scan-root PATH." >&2

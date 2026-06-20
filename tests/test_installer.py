@@ -28,7 +28,13 @@ def fake_bin(tmp_path: Path, names: List[str]) -> Path:
     return bin_dir
 
 
-def run_install_args(home: Path, args: List[str], extra_path: Optional[Path] = None):
+def run_install_args(
+    home: Path,
+    args: List[str],
+    extra_path: Optional[Path] = None,
+    input_text: Optional[str] = None,
+    timeout: int = 15,
+):
     env = os.environ.copy()
     bin_dir = fake_bin(home, ["openclaw", "claude", "opencode", "codex", "hermes"])
     env["HOME"] = str(home)
@@ -37,7 +43,15 @@ def run_install_args(home: Path, args: List[str], extra_path: Optional[Path] = N
         path_entries.insert(0, str(extra_path))
     env["PATH"] = ":".join(path_entries)
     env["DOCMATE_USE_LOCAL_CACHE"] = "true"
-    return subprocess.run(args, text=True, capture_output=True, env=env, check=False)
+    return subprocess.run(
+        args,
+        text=True,
+        input=input_text,
+        capture_output=True,
+        env=env,
+        check=False,
+        timeout=timeout,
+    )
 
 
 def run_install(home: Path, repo: Path, extra_args: Optional[List[str]] = None, path_flag: str = "--repo"):
@@ -57,7 +71,7 @@ def run_install(home: Path, repo: Path, extra_args: Optional[List[str]] = None, 
     return run_install_args(home, args)
 
 
-def test_installer_without_repo_exits_when_interactive_input_is_unavailable(tmp_path):
+def test_piped_installer_without_repo_exits_when_interactive_input_is_unavailable(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
 
@@ -65,12 +79,14 @@ def test_installer_without_repo_exits_when_interactive_input_is_unavailable(tmp_
         home,
         [
             "bash",
-            str(ROOT / "scripts" / "install.sh"),
         ],
+        input_text=(ROOT / "scripts" / "install.sh").read_text(),
+        timeout=5,
     )
 
     assert result.returncode != 0
     assert "no repositories selected" in result.stderr
+    assert "BASH_SOURCE" not in result.stderr
     assert "Invalid choice" not in result.stdout
 
 
