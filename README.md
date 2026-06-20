@@ -1,5 +1,62 @@
 # DocMate
 
+DocMate is a skill-first documentation QA and documentation repair assistant for
+agent hosts. It helps an agent answer from project documentation, verify gaps
+against code, and optionally repair documentation by opening a GitHub pull
+request or GitLab merge request.
+
+## What It Does
+
+- Installs as a skill for OpenClaw, Claude Code, OpenCode, Codex, and Hermes.
+- Uses `~/.agents/skills/docmate` as the canonical install; Codex reads that
+  canonical skill directory directly.
+- Uses an agent-readable `docmate.catalog.json` as a repository catalog.
+- Routes to a configured repository path, then lets the agent discover
+  documentation and related code evidence during the task.
+- Reports documentation gaps with document evidence, code evidence, affected
+  docs, and confidence.
+- Supports `ask`, `auto`, and `off` modes for documentation repair.
+- Uses temporary git worktrees so documentation repair does not dirty the user's
+  main checkout.
+- Opens GitHub PRs with `gh` and GitLab MRs with `glab`.
+
+## Quick Start
+
+One-line install:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/wufei-png/DocMate/main/scripts/install.sh | bash
+```
+
+Non-interactive install with explicit repositories:
+
+```bash
+bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --hosts all --update-mode ask
+```
+
+Non-interactive install with repository auto scan:
+
+```bash
+bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix
+```
+
+Then edit:
+
+```text
+~/.agents/skills/docmate/references/docmate.catalog.json
+```
+
+Add repository aliases, descriptions, base branch candidates, and update mode.
+The installer seeds `baseBranchCandidates` from each repository's detected
+remote default branch; edit it only when the repair base should differ.
+
+## Validation
+
+```bash
+bash scripts/validate_catalog.sh ~/.agents/skills/docmate/references/docmate.catalog.json
+python3 -m pytest -q
+```
+
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).

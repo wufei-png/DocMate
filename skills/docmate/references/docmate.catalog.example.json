@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "installHosts": ["openclaw", "claude-code", "opencode", "codex", "hermes"],
+  "defaults": {
+    "update": {
+      "mode": "ask"
+    }
+  },
+  "repos": [
+    {
+      "name": "docs-site",
+      "description": "Public documentation repository for the product.",
+      "path": "/path/to/docs-site",
+      "aliases": ["docs", "site"],
+      "baseBranchCandidates": ["main"],
+      "update": {
+        "mode": "ask"
+      }
+    },
+    {
+      "name": "internal-runbooks",
+      "description": "Operational runbooks and troubleshooting notes.",
+      "path": "/path/to/runbooks",
+      "aliases": ["runbooks", "ops-docs"],
+      "baseBranchCandidates": ["main"],
+      "update": {
+        "mode": "off"
+      }
+    }
+  ]
+}
