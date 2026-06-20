@@ -9,6 +9,9 @@ One-line install from GitHub:
 curl -fsSL https://raw.githubusercontent.com/wufei-png/DocMate/main/scripts/install.sh | bash
 ```
 
+Interactive installs use keyboard menus when a TTY is available: Up/Down moves,
+Space selects, and Enter selects or confirms depending on the menu.
+
 Install from a local clone with explicit repositories:
 
 ```bash

@@ -79,6 +79,17 @@ SUPPORTED_HOSTS=(openclaw claude-code opencode codex hermes)
 HOSTS=()
 INSTALL_STRATEGY="symlink"
 INSTALL_TARGET_DIR="$CANONICAL_DIR"
+MENU_LABELS=()
+MENU_VALUES=()
+MENU_ENABLED=()
+MENU_SELECTED=()
+MENU_ROW_DETECTED=()
+MENU_RESULT=""
+MENU_RESULTS=()
+MENU_CURSOR=0
+MENU_LINES=0
+MENU_MESSAGE=""
+MENU_ALL_DETECTED_MODE=0
 
 cleanup() {
   local tmp_file
@@ -90,6 +101,248 @@ trap cleanup EXIT
 
 can_prompt() {
   [ "$TTY_AVAILABLE" -eq 1 ] || [ -t 0 ]
+}
+
+can_use_interactive_menu() {
+  [ "$TTY_AVAILABLE" -eq 1 ] && [ "${TERM:-dumb}" != "dumb" ]
+}
+
+ui_printf() {
+  if [ "$TTY_AVAILABLE" -eq 1 ]; then
+    printf "%b" "$1" >&$TTY_FD
+  else
+    printf "%b" "$1"
+  fi
+}
+
+read_menu_key() {
+  local key=""
+  local rest=""
+
+  IFS= read -rsn1 key <&$TTY_FD || return 1
+  if [ "$key" = $'\x1b' ]; then
+    IFS= read -rsn2 rest <&$TTY_FD || true
+    key="$key$rest"
+  fi
+
+  case "$key" in
+    $'\x1b[A') printf '%s\n' "up" ;;
+    $'\x1b[B') printf '%s\n' "down" ;;
+    " ") printf '%s\n' "space" ;;
+    ""|$'\r') printf '%s\n' "enter" ;;
+    *) printf '%s\n' "other" ;;
+  esac
+}
+
+draw_menu() {
+  local title="$1"
+  local hint="$2"
+  local index=0
+  local marker=""
+  local checkbox=""
+  local line=""
+
+  if [ "$MENU_LINES" -gt 0 ]; then
+    ui_printf "\033[${MENU_LINES}A"
+  fi
+  ui_printf "\033[J"
+
+  MENU_LINES=0
+  ui_printf "${title}\n"
+  MENU_LINES=$((MENU_LINES + 1))
+  ui_printf "${hint}\n"
+  MENU_LINES=$((MENU_LINES + 1))
+
+  for index in "${!MENU_LABELS[@]}"; do
+    marker=" "
+    if [ "$index" -eq "$MENU_CURSOR" ]; then
+      marker=">"
+    fi
+
+    checkbox="[ ]"
+    if [ "${MENU_SELECTED[$index]:-0}" -eq 1 ]; then
+      checkbox="[x]"
+    fi
+
+    line="${marker} ${checkbox} ${MENU_LABELS[$index]}"
+    if [ "${MENU_ENABLED[$index]:-1}" -ne 1 ]; then
+      line="${line} (not available)"
+    fi
+    ui_printf "${line}\n"
+    MENU_LINES=$((MENU_LINES + 1))
+  done
+
+  if [ -n "$MENU_MESSAGE" ]; then
+    ui_printf "${MENU_MESSAGE}\n"
+  else
+    ui_printf "\n"
+  fi
+  MENU_LINES=$((MENU_LINES + 1))
+}
+
+sync_all_detected_row() {
+  local index=0
+  local detected_count=0
+  local selected_count=0
+
+  if [ "$MENU_ALL_DETECTED_MODE" -ne 1 ]; then
+    return
+  fi
+
+  for index in "${!MENU_LABELS[@]}"; do
+    if [ "$index" -eq 0 ]; then
+      continue
+    fi
+    if [ "${MENU_ROW_DETECTED[$index]:-0}" -eq 1 ]; then
+      detected_count=$((detected_count + 1))
+      if [ "${MENU_SELECTED[$index]:-0}" -eq 1 ]; then
+        selected_count=$((selected_count + 1))
+      fi
+    fi
+  done
+
+  if [ "$detected_count" -gt 0 ] && [ "$selected_count" -eq "$detected_count" ]; then
+    MENU_SELECTED[0]=1
+  else
+    MENU_SELECTED[0]=0
+  fi
+}
+
+toggle_all_detected_rows() {
+  local index=0
+  local next_state=1
+
+  if [ "${MENU_SELECTED[0]:-0}" -eq 1 ]; then
+    next_state=0
+  fi
+
+  MENU_SELECTED[0]=$next_state
+  for index in "${!MENU_LABELS[@]}"; do
+    if [ "$index" -eq 0 ]; then
+      continue
+    fi
+    if [ "${MENU_ROW_DETECTED[$index]:-0}" -eq 1 ]; then
+      MENU_SELECTED[$index]=$next_state
+    fi
+  done
+}
+
+run_menu() {
+  local title="$1"
+  local mode="$2"
+  local empty_message="$3"
+  local hint=""
+  local key=""
+  local selected_count=0
+  local index=0
+
+  MENU_RESULT=""
+  MENU_RESULTS=()
+  MENU_CURSOR=0
+  MENU_LINES=0
+  MENU_MESSAGE=""
+  MENU_SELECTED=()
+
+  for index in "${!MENU_LABELS[@]}"; do
+    MENU_SELECTED[$index]=0
+  done
+  if [ "$mode" = "single" ] && [ "${#MENU_LABELS[@]}" -gt 0 ]; then
+    MENU_SELECTED[0]=1
+  fi
+  if [ "$mode" = "multi" ]; then
+    sync_all_detected_row
+  fi
+
+  if [ "$mode" = "multi" ]; then
+    hint="Use Up/Down to move, Space to select, Enter to confirm."
+  else
+    hint="Use Up/Down to move, Space or Enter to select."
+  fi
+
+  ui_printf "\033[?25l"
+  while true; do
+    draw_menu "$title" "$hint"
+    key="$(read_menu_key)" || key="enter"
+
+    case "$key" in
+      up)
+        if [ "$MENU_CURSOR" -gt 0 ]; then
+          MENU_CURSOR=$((MENU_CURSOR - 1))
+        else
+          MENU_CURSOR=$((${#MENU_LABELS[@]} - 1))
+        fi
+        if [ "$mode" = "single" ]; then
+          for index in "${!MENU_SELECTED[@]}"; do
+            MENU_SELECTED[$index]=0
+          done
+          MENU_SELECTED[$MENU_CURSOR]=1
+        fi
+        MENU_MESSAGE=""
+        ;;
+      down)
+        if [ "$MENU_CURSOR" -lt $((${#MENU_LABELS[@]} - 1)) ]; then
+          MENU_CURSOR=$((MENU_CURSOR + 1))
+        else
+          MENU_CURSOR=0
+        fi
+        if [ "$mode" = "single" ]; then
+          for index in "${!MENU_SELECTED[@]}"; do
+            MENU_SELECTED[$index]=0
+          done
+          MENU_SELECTED[$MENU_CURSOR]=1
+        fi
+        MENU_MESSAGE=""
+        ;;
+      space|enter)
+        if [ "${MENU_ENABLED[$MENU_CURSOR]:-1}" -ne 1 ]; then
+          MENU_MESSAGE="This option is not available."
+          continue
+        fi
+
+        if [ "$mode" = "single" ]; then
+          MENU_RESULT="${MENU_VALUES[$MENU_CURSOR]}"
+          MENU_RESULTS=("$MENU_RESULT")
+          break
+        fi
+
+        if [ "$key" = "space" ]; then
+          if [ "$MENU_ALL_DETECTED_MODE" -eq 1 ] && [ "$MENU_CURSOR" -eq 0 ]; then
+            toggle_all_detected_rows
+          elif [ "${MENU_SELECTED[$MENU_CURSOR]:-0}" -eq 1 ]; then
+            MENU_SELECTED[$MENU_CURSOR]=0
+          else
+            MENU_SELECTED[$MENU_CURSOR]=1
+          fi
+          sync_all_detected_row
+          MENU_MESSAGE=""
+          continue
+        fi
+
+        selected_count=0
+        MENU_RESULTS=()
+        for index in "${!MENU_SELECTED[@]}"; do
+          if [ "$MENU_ALL_DETECTED_MODE" -eq 1 ] && [ "$index" -eq 0 ]; then
+            continue
+          fi
+          if [ "${MENU_SELECTED[$index]:-0}" -eq 1 ]; then
+            selected_count=$((selected_count + 1))
+            MENU_RESULTS+=("${MENU_VALUES[$index]}")
+          fi
+        done
+
+        if [ "$selected_count" -eq 0 ]; then
+          MENU_MESSAGE="$empty_message"
+          continue
+        fi
+
+        MENU_RESULT="${MENU_RESULTS[0]}"
+        break
+        ;;
+    esac
+  done
+
+  ui_printf "\033[?25h"
+  ui_printf "\n"
 }
 
 array_contains() {
@@ -220,8 +473,52 @@ print_host_summary() {
   echo ""
 }
 
+build_host_menu_rows() {
+  local include_all="$1"
+  local host=""
+  local detected=0
+
+  MENU_LABELS=()
+  MENU_VALUES=()
+  MENU_ENABLED=()
+  MENU_ROW_DETECTED=()
+
+  if [ "$include_all" = "true" ]; then
+    MENU_LABELS+=("All detected hosts")
+    MENU_VALUES+=("all-detected")
+    MENU_ENABLED+=(1)
+    MENU_ROW_DETECTED+=(0)
+  fi
+
+  for host in "${SUPPORTED_HOSTS[@]}"; do
+    detected=0
+    if is_host_detected "$host"; then
+      detected=1
+    fi
+    MENU_LABELS+=("$(host_label "$host") ($(host_status_label "$host"))")
+    MENU_VALUES+=("$host")
+    MENU_ENABLED+=(1)
+    MENU_ROW_DETECTED+=("$detected")
+  done
+}
+
 select_install_mode_interactive() {
   local choice=""
+
+  if can_use_interactive_menu; then
+    MENU_LABELS=(
+      "Global (recommended) - install to ~/.agents/skills and link detected hosts"
+      "Single host - install directly to one host"
+      "Custom hosts - install globally and link selected hosts"
+    )
+    MENU_VALUES=(global single custom)
+    MENU_ENABLED=(1 1 1)
+    MENU_ROW_DETECTED=(0 0 0)
+    MENU_ALL_DETECTED_MODE=0
+    run_menu "Install target mode" "single" "Please select one install mode."
+    INSTALL_MODE="$MENU_RESULT"
+    return
+  fi
 
   echo "Install target mode:"
   echo "  [1] Global (recommended) - install to ~/.agents/skills and link detected hosts"
@@ -243,6 +540,14 @@ select_install_mode_interactive() {
 
 select_single_host_interactive() {
   local choice=""
+
+  if can_use_interactive_menu; then
+    build_host_menu_rows "false"
+    MENU_ALL_DETECTED_MODE=0
+    run_menu "Select one install host" "single" "Please select one install host."
+    HOSTS=("$MENU_RESULT")
+    return
+  fi
 
   echo "Select one install host:"
   echo "  [1] OpenClaw     ($(host_status_label "openclaw"))"
@@ -269,6 +574,15 @@ select_single_host_interactive() {
 select_custom_hosts_interactive() {
   local choices=""
   local choice=""
+
+  if can_use_interactive_menu; then
+    build_host_menu_rows "true"
+    MENU_ALL_DETECTED_MODE=1
+    run_menu "Select install hosts" "multi" "Please select at least one install host."
+    HOSTS=("${MENU_RESULTS[@]}")
+    MENU_ALL_DETECTED_MODE=0
+    return
+  fi
 
   echo "Select install hosts:"
   echo "  [0] All detected hosts"
@@ -520,7 +834,7 @@ read_user_line() {
   local prompt="$1"
 
   if [ "$TTY_AVAILABLE" -eq 1 ]; then
-    printf "%s" "$prompt" >&$TTY_FD
+    ui_printf "$prompt"
     if IFS= read -r REPLY <&$TTY_FD; then
       return
     fi
@@ -548,6 +862,22 @@ confirm_yes_no() {
   local default_answer="${2:-no}"
   local answer=""
   local suffix="[y/N]"
+
+  if can_use_interactive_menu; then
+    if [ "$default_answer" = "yes" ]; then
+      MENU_LABELS=("Yes (default)" "No")
+      MENU_VALUES=(yes no)
+    else
+      MENU_LABELS=("No (default)" "Yes")
+      MENU_VALUES=(no yes)
+    fi
+    MENU_ENABLED=(1 1)
+    MENU_ROW_DETECTED=(0 0)
+    MENU_ALL_DETECTED_MODE=0
+    run_menu "$prompt" "single" "Please select yes or no."
+    [ "$MENU_RESULT" = "yes" ]
+    return
+  fi
 
   if [ "$default_answer" = "yes" ]; then
     suffix="[Y/n]"
@@ -648,6 +978,35 @@ resolve_duplicate_repo_names() {
       echo "Warning: keeping ${REPOS[$first]} and excluding ${REPOS[$second]}"
       remove_repo_index "$second"
       continue
+    fi
+
+    if can_use_interactive_menu; then
+      MENU_LABELS=(
+        "Exit install"
+        "Exclude A: ${REPOS[$first]}"
+        "Exclude B: ${REPOS[$second]}"
+      )
+      MENU_VALUES=(exit exclude-first exclude-second)
+      MENU_ENABLED=(1 1 1)
+      MENU_ROW_DETECTED=(0 0 0)
+      MENU_ALL_DETECTED_MODE=0
+      run_menu "Duplicate repository name action" "single" "Please choose how to resolve the duplicate repository name."
+      case "$MENU_RESULT" in
+        exit)
+          echo "Install cancelled because duplicate repository names must be resolved."
+          exit 1
+          ;;
+        exclude-first)
+          echo "Excluding ${REPOS[$first]}"
+          remove_repo_index "$first"
+          continue
+          ;;
+        exclude-second)
+          echo "Excluding ${REPOS[$second]}"
+          remove_repo_index "$second"
+          continue
+          ;;
+      esac
     fi
 
     while true; do
@@ -973,6 +1332,32 @@ collect_manual_repos() {
 
 select_scan_depth_interactive() {
   local depth=""
+  local option=""
+
+  if can_use_interactive_menu; then
+    MENU_LABELS=("$SCAN_MAX_DEPTH (default)")
+    MENU_VALUES=("$SCAN_MAX_DEPTH")
+    MENU_ENABLED=(1)
+    MENU_ROW_DETECTED=(0)
+    for option in 1 2 3 4 5; do
+      if [ "$option" != "$SCAN_MAX_DEPTH" ]; then
+        MENU_LABELS+=("$option")
+        MENU_VALUES+=("$option")
+        MENU_ENABLED+=(1)
+        MENU_ROW_DETECTED+=(0)
+      fi
+    done
+    MENU_LABELS+=("Custom depth")
+    MENU_VALUES+=(custom)
+    MENU_ENABLED+=(1)
+    MENU_ROW_DETECTED+=(0)
+    MENU_ALL_DETECTED_MODE=0
+    run_menu "Repository scan depth" "single" "Please select one scan depth."
+    if [ "$MENU_RESULT" != "custom" ]; then
+      SCAN_MAX_DEPTH="$MENU_RESULT"
+      return
+    fi
+  fi
 
   while true; do
     read_user_line "Repository scan depth [default: $SCAN_MAX_DEPTH]: "
@@ -1056,6 +1441,23 @@ discover_repos_interactive() {
   local choice=""
 
   while [ "${#REPOS[@]}" -eq 0 ]; do
+    if can_use_interactive_menu; then
+      MENU_LABELS=(
+        "Auto scan - search for git repositories under a prefix"
+        "Manual input - enter repository paths one by one"
+      )
+      MENU_VALUES=(auto manual)
+      MENU_ENABLED=(1 1)
+      MENU_ROW_DETECTED=(0 0)
+      MENU_ALL_DETECTED_MODE=0
+      run_menu "Repository discovery" "single" "Please select one repository discovery mode."
+      case "$MENU_RESULT" in
+        auto) collect_auto_scan_repos ;;
+        manual) collect_manual_repos ;;
+      esac
+      continue
+    fi
+
     echo "Repository discovery:"
     echo "  [1] Manual input"
     echo "  [2] Auto scan"
