@@ -22,6 +22,11 @@ SCAN_ROOT=""
 REPO_ARGS=()
 REPOS=()
 TMP_FILES=()
+TTY_FD=9
+TTY_AVAILABLE=0
+if { exec 9<>/dev/tty; } 2>/dev/null; then
+  TTY_AVAILABLE=1
+fi
 
 usage() {
   cat >&2 <<'EOF'
@@ -69,6 +74,10 @@ cleanup() {
   done
 }
 trap cleanup EXIT
+
+can_prompt() {
+  [ "$TTY_AVAILABLE" -eq 1 ] || [ -t 0 ]
+}
 
 should_use_local_file() {
   local rel_path="$1"
@@ -223,8 +232,21 @@ prepare_canonical_target() {
 
 read_user_line() {
   local prompt="$1"
-  printf "%s" "$prompt"
-  IFS= read -r REPLY || REPLY=""
+
+  if [ "$TTY_AVAILABLE" -eq 1 ]; then
+    printf "%s" "$prompt" >&$TTY_FD
+    IFS= read -r REPLY <&$TTY_FD || REPLY=""
+    return
+  fi
+
+  if [ -t 0 ]; then
+    printf "%s" "$prompt"
+    IFS= read -r REPLY || REPLY=""
+    return
+  fi
+
+  echo "Error: interactive input is unavailable. Re-run with --repo PATH or --auto-scan --scan-root PATH." >&2
+  exit 1
 }
 
 confirm_yes_no() {
@@ -656,7 +678,7 @@ if [ "$AUTO_SCAN" -eq 1 ]; then
 fi
 
 if [ "${#REPOS[@]}" -eq 0 ]; then
-  if [ "$YES" -eq 1 ]; then
+  if [ "$YES" -eq 1 ] || ! can_prompt; then
     echo "Error: no repositories selected. Use --repo PATH or --auto-scan --scan-root PATH." >&2
     exit 1
   fi

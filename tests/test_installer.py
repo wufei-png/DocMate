@@ -57,6 +57,23 @@ def run_install(home: Path, repo: Path, extra_args: Optional[List[str]] = None, 
     return run_install_args(home, args)
 
 
+def test_installer_without_repo_exits_when_interactive_input_is_unavailable(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+        ],
+    )
+
+    assert result.returncode != 0
+    assert "no repositories selected" in result.stderr
+    assert "Invalid choice" not in result.stdout
+
+
 def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
