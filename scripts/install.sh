@@ -19,7 +19,9 @@ DOCMATE_USE_LOCAL_CACHE="${DOCMATE_USE_LOCAL_CACHE:-auto}"
 SCAN_MAX_DEPTH="${DOCMATE_SCAN_MAX_DEPTH:-5}"
 
 YES=0
-HOSTS_RAW="all"
+HOSTS_RAW=""
+HOSTS_ARG_SET=0
+INSTALL_MODE=""
 EXISTING="backup"
 UPDATE_MODE="ask"
 AUTO_SCAN=0
@@ -36,8 +38,8 @@ fi
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  install.sh [--yes] --repo PATH [--repo PATH ...] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
-  install.sh [--yes] --auto-scan --scan-root PATH [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
+  install.sh [--yes] --repo PATH [--repo PATH ...] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
+  install.sh [--yes] --auto-scan --scan-root PATH [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
   install.sh
 
 Pipe install:
@@ -54,7 +56,8 @@ while [ "$#" -gt 0 ]; do
     --repo|--project) REPO_ARGS+=("${2:-}"); shift 2 ;;
     --auto-scan) AUTO_SCAN=1; shift ;;
     --scan-root) SCAN_ROOT="${2:-}"; shift 2 ;;
-    --hosts) HOSTS_RAW="${2:-}"; shift 2 ;;
+    --install-mode) INSTALL_MODE="${2:-}"; shift 2 ;;
+    --hosts) HOSTS_RAW="${2:-}"; HOSTS_ARG_SET=1; shift 2 ;;
     --existing) EXISTING="${2:-}"; shift 2 ;;
     --update-mode) UPDATE_MODE="${2:-}"; shift 2 ;;
     -h|--help) usage ;;
@@ -63,14 +66,13 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$EXISTING" in backup|skip|overwrite) ;; *) usage ;; esac
+case "$INSTALL_MODE" in ""|global|single|custom) ;; *) usage ;; esac
 case "$UPDATE_MODE" in ask|auto|off) ;; *) usage ;; esac
 
+SUPPORTED_HOSTS=(openclaw claude-code opencode codex hermes)
 HOSTS=()
-if [ "$HOSTS_RAW" = "all" ]; then
-  HOSTS=(openclaw claude-code opencode codex hermes)
-else
-  IFS=',' read -r -a HOSTS <<< "$HOSTS_RAW"
-fi
+INSTALL_STRATEGY="symlink"
+INSTALL_TARGET_DIR="$CANONICAL_DIR"
 
 cleanup() {
   local tmp_file
@@ -82,6 +84,271 @@ trap cleanup EXIT
 
 can_prompt() {
   [ "$TTY_AVAILABLE" -eq 1 ] || [ -t 0 ]
+}
+
+array_contains() {
+  local needle="$1"
+  shift || true
+
+  local item
+  for item in "$@"; do
+    if [ "$item" = "$needle" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+join_by_comma() {
+  local IFS=","
+  printf '%s\n' "$*"
+}
+
+host_command() {
+  case "$1" in
+    openclaw) printf '%s\n' "openclaw" ;;
+    claude-code) printf '%s\n' "claude" ;;
+    opencode) printf '%s\n' "opencode" ;;
+    codex) printf '%s\n' "codex" ;;
+    hermes) printf '%s\n' "hermes" ;;
+    *) return 1 ;;
+  esac
+}
+
+host_label() {
+  case "$1" in
+    openclaw) printf '%s\n' "OpenClaw" ;;
+    claude-code) printf '%s\n' "Claude Code" ;;
+    opencode) printf '%s\n' "OpenCode" ;;
+    codex) printf '%s\n' "Codex" ;;
+    hermes) printf '%s\n' "Hermes" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+is_supported_host() {
+  local host="$1"
+  array_contains "$host" "${SUPPORTED_HOSTS[@]}"
+}
+
+is_host_detected() {
+  local command_name
+  command_name="$(host_command "$1")" || return 1
+  command -v "$command_name" >/dev/null 2>&1
+}
+
+host_status_label() {
+  if is_host_detected "$1"; then
+    printf '%s\n' "detected"
+  else
+    printf '%s\n' "not detected, can still create directory"
+  fi
+}
+
+add_selected_host() {
+  local host="$1"
+
+  if ! is_supported_host "$host"; then
+    echo "Error: unsupported host: $host" >&2
+    exit 1
+  fi
+  if ! array_contains "$host" "${HOSTS[@]}"; then
+    HOSTS+=("$host")
+  fi
+}
+
+parse_hosts_raw() {
+  local raw_hosts="$1"
+  local host=""
+
+  HOSTS=()
+  if [ -z "$raw_hosts" ]; then
+    echo "Error: --hosts requires at least one host or all" >&2
+    exit 1
+  fi
+
+  if [ "$raw_hosts" = "all" ]; then
+    HOSTS=("${SUPPORTED_HOSTS[@]}")
+    return
+  fi
+
+  for host in $(printf '%s\n' "$raw_hosts" | tr ',' ' '); do
+    add_selected_host "$host"
+  done
+
+  if [ "${#HOSTS[@]}" -eq 0 ]; then
+    echo "Error: --hosts did not select any supported host" >&2
+    exit 1
+  fi
+}
+
+select_detected_hosts() {
+  local host
+
+  HOSTS=()
+  for host in "${SUPPORTED_HOSTS[@]}"; do
+    if is_host_detected "$host"; then
+      HOSTS+=("$host")
+    fi
+  done
+
+  if [ "${#HOSTS[@]}" -eq 0 ]; then
+    echo "Warning: no supported agent host CLI detected; using Codex canonical install target."
+    HOSTS=(codex)
+  fi
+}
+
+print_host_summary() {
+  local host
+  local marker
+
+  echo "Install host status:"
+  for host in "${SUPPORTED_HOSTS[@]}"; do
+    marker="[ ]"
+    if array_contains "$host" "${HOSTS[@]}"; then
+      marker="[x]"
+    fi
+    echo "  $marker $(host_label "$host") ($(host_status_label "$host"))"
+  done
+  echo ""
+}
+
+select_install_mode_interactive() {
+  local choice=""
+
+  echo "Install target mode:"
+  echo "  [1] Global (recommended) - install to ~/.agents/skills and link detected hosts"
+  echo "  [2] Single host - install directly to one host"
+  echo "  [3] Custom hosts - install globally and link selected hosts"
+  echo ""
+
+  while true; do
+    read_user_line "Enter choice [1-3, default 1]: "
+    choice="$REPLY"
+    case "$choice" in
+      ""|1) INSTALL_MODE="global"; break ;;
+      2) INSTALL_MODE="single"; break ;;
+      3) INSTALL_MODE="custom"; break ;;
+      *) echo "Invalid choice. Please try again." ;;
+    esac
+  done
+}
+
+select_single_host_interactive() {
+  local choice=""
+
+  echo "Select one install host:"
+  echo "  [1] OpenClaw     ($(host_status_label "openclaw"))"
+  echo "  [2] Claude Code  ($(host_status_label "claude-code"))"
+  echo "  [3] OpenCode     ($(host_status_label "opencode"))"
+  echo "  [4] Codex        ($(host_status_label "codex"))"
+  echo "  [5] Hermes       ($(host_status_label "hermes"))"
+  echo ""
+
+  while true; do
+    read_user_line "Enter choice [1-5]: "
+    choice="$REPLY"
+    case "$choice" in
+      1) HOSTS=(openclaw); break ;;
+      2) HOSTS=(claude-code); break ;;
+      3) HOSTS=(opencode); break ;;
+      4) HOSTS=(codex); break ;;
+      5) HOSTS=(hermes); break ;;
+      *) echo "Invalid choice. Please try again." ;;
+    esac
+  done
+}
+
+select_custom_hosts_interactive() {
+  local choices=""
+  local choice=""
+
+  echo "Select install hosts:"
+  echo "  [0] All detected hosts"
+  echo "  [1] OpenClaw     ($(host_status_label "openclaw"))"
+  echo "  [2] Claude Code  ($(host_status_label "claude-code"))"
+  echo "  [3] OpenCode     ($(host_status_label "opencode"))"
+  echo "  [4] Codex        ($(host_status_label "codex"))"
+  echo "  [5] Hermes       ($(host_status_label "hermes"))"
+  echo ""
+
+  while true; do
+    HOSTS=()
+    read_user_line "Enter numbers (e.g., 0 or 1,3,5): "
+    choices="$REPLY"
+    for choice in $(printf '%s\n' "$choices" | tr ',' ' '); do
+      case "$choice" in
+        0|all|ALL)
+          select_detected_hosts
+          ;;
+        1) add_selected_host "openclaw" ;;
+        2) add_selected_host "claude-code" ;;
+        3) add_selected_host "opencode" ;;
+        4) add_selected_host "codex" ;;
+        5) add_selected_host "hermes" ;;
+        "") ;;
+        *) echo "Warning: ignoring invalid host choice: $choice" ;;
+      esac
+    done
+
+    if [ "${#HOSTS[@]}" -gt 0 ]; then
+      break
+    fi
+    echo "Please select at least one install host."
+  done
+}
+
+select_install_targets() {
+  if [ "$HOSTS_ARG_SET" -eq 1 ]; then
+    parse_hosts_raw "$HOSTS_RAW"
+    if [ -z "$INSTALL_MODE" ]; then
+      INSTALL_MODE="custom"
+    fi
+  else
+    if [ -z "$INSTALL_MODE" ]; then
+      if [ "$YES" -eq 1 ] || ! can_prompt; then
+        INSTALL_MODE="global"
+      else
+        select_install_mode_interactive
+      fi
+    fi
+
+    case "$INSTALL_MODE" in
+      global)
+        select_detected_hosts
+        ;;
+      single)
+        if [ "$YES" -eq 1 ] || ! can_prompt; then
+          echo "Error: --install-mode single requires --hosts HOST in non-interactive mode" >&2
+          exit 1
+        fi
+        select_single_host_interactive
+        ;;
+      custom)
+        if [ "$YES" -eq 1 ] || ! can_prompt; then
+          echo "Error: --install-mode custom requires --hosts HOST[,HOST...] in non-interactive mode" >&2
+          exit 1
+        fi
+        select_custom_hosts_interactive
+        ;;
+    esac
+  fi
+
+  if [ "$INSTALL_MODE" = "single" ]; then
+    if [ "${#HOSTS[@]}" -ne 1 ]; then
+      echo "Error: single host install requires exactly one selected host" >&2
+      exit 1
+    fi
+    INSTALL_STRATEGY="direct"
+    INSTALL_TARGET_DIR="$(host_dir "${HOSTS[0]}")"
+  else
+    INSTALL_STRATEGY="symlink"
+    INSTALL_TARGET_DIR="$CANONICAL_DIR"
+  fi
+
+  echo "Selected install mode: $INSTALL_MODE"
+  print_host_summary
 }
 
 should_use_local_file() {
@@ -216,28 +483,31 @@ prepare_target() {
   mkdir -p "$(dirname "$target")"
 }
 
-prepare_canonical_target() {
-  if [ ! -e "$CANONICAL_DIR" ] && [ ! -L "$CANONICAL_DIR" ]; then
-    mkdir -p "$CANONICAL_DIR"
+prepare_install_dir() {
+  local target="$1"
+  local label="${2:-install target}"
+
+  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+    mkdir -p "$target"
     return
   fi
 
   case "$EXISTING" in
     skip)
-      echo "Skipping existing canonical target: $CANONICAL_DIR"
+      echo "Skipping existing $label: $target"
       return 1
       ;;
     overwrite)
-      rm -rf "$CANONICAL_DIR"
+      rm -rf "$target"
       ;;
     backup)
       local backup
-      backup="$(backup_path "$CANONICAL_DIR")"
-      mv "$CANONICAL_DIR" "$backup"
-      echo "Backed up $CANONICAL_DIR to $backup"
+      backup="$(backup_path "$target")"
+      mv "$target" "$backup"
+      echo "Backed up $target to $backup"
       ;;
   esac
-  mkdir -p "$CANONICAL_DIR"
+  mkdir -p "$target"
 }
 
 read_user_line() {
@@ -321,6 +591,85 @@ add_repo_path() {
 
   REPOS+=("$repo_path")
   echo "Added repository: $(basename "$repo_path") ($repo_path)"
+}
+
+remove_repo_index() {
+  local remove_index="$1"
+  local index=0
+  local filtered=()
+
+  for index in "${!REPOS[@]}"; do
+    if [ "$index" -ne "$remove_index" ]; then
+      filtered+=("${REPOS[$index]}")
+    fi
+  done
+
+  REPOS=("${filtered[@]}")
+}
+
+resolve_duplicate_repo_names() {
+  local first=0
+  local second=0
+  local duplicate_name=""
+  local choice=""
+
+  while true; do
+    duplicate_name=""
+    first=0
+    second=0
+
+    for first in "${!REPOS[@]}"; do
+      for second in "${!REPOS[@]}"; do
+        if [ "$second" -le "$first" ]; then
+          continue
+        fi
+        if [ "$(basename "${REPOS[$first]}")" = "$(basename "${REPOS[$second]}")" ]; then
+          duplicate_name="$(basename "${REPOS[$first]}")"
+          break 2
+        fi
+      done
+    done
+
+    if [ -z "$duplicate_name" ]; then
+      return
+    fi
+
+    echo "Warning: duplicate repository name detected: $duplicate_name"
+    echo "  [A] ${REPOS[$first]}"
+    echo "  [B] ${REPOS[$second]}"
+
+    if [ "$YES" -eq 1 ] || ! can_prompt; then
+      echo "Warning: keeping ${REPOS[$first]} and excluding ${REPOS[$second]}"
+      remove_repo_index "$second"
+      continue
+    fi
+
+    while true; do
+      echo "Duplicate repository name action:"
+      echo "  [1] Exit install"
+      echo "  [2] Exclude A: ${REPOS[$first]}"
+      echo "  [3] Exclude B: ${REPOS[$second]}"
+      read_user_line "Enter choice [1-3]: "
+      choice="$REPLY"
+      case "$choice" in
+        1)
+          echo "Install cancelled because duplicate repository names must be resolved."
+          exit 1
+          ;;
+        2)
+          echo "Excluding ${REPOS[$first]}"
+          remove_repo_index "$first"
+          break
+          ;;
+        3)
+          echo "Excluding ${REPOS[$second]}"
+          remove_repo_index "$second"
+          break
+          ;;
+        *) echo "Invalid choice. Please try again." ;;
+      esac
+    done
+  done
 }
 
 git_top_level() {
@@ -703,14 +1052,17 @@ if [ "${#REPOS[@]}" -eq 0 ]; then
   discover_repos_interactive
 fi
 
-if ! prepare_canonical_target; then
-  echo "DocMate install skipped. Use --existing backup or --existing overwrite to replace the canonical install."
+resolve_duplicate_repo_names
+select_install_targets
+
+if ! prepare_install_dir "$INSTALL_TARGET_DIR" "$INSTALL_MODE install target"; then
+  echo "DocMate install skipped. Use --existing backup or --existing overwrite to replace the install target."
   exit 0
 fi
 
-materialize_file "skills/docmate/SKILL.md" "$CANONICAL_DIR/SKILL.md"
-mkdir -p "$CANONICAL_DIR/references"
-materialize_file "skills/docmate/references/docmate.catalog.example.json" "$CANONICAL_DIR/references/docmate.catalog.example.json"
+materialize_file "skills/docmate/SKILL.md" "$INSTALL_TARGET_DIR/SKILL.md"
+mkdir -p "$INSTALL_TARGET_DIR/references"
+materialize_file "skills/docmate/references/docmate.catalog.example.json" "$INSTALL_TARGET_DIR/references/docmate.catalog.example.json"
 
 NODE_BIN="$(find_node)"
 REPO_FILE="$(mktemp)"
@@ -719,14 +1071,13 @@ for repo_path in "${REPOS[@]}"; do
   printf '%s\t%s\n' "$repo_path" "$(detect_default_branch "$repo_path")" >> "$REPO_FILE"
 done
 
-"$NODE_BIN" - "$CANONICAL_DIR/references/docmate.catalog.json" "$SCHEMA_VERSION" "$HOSTS_RAW" "$UPDATE_MODE" "$REPO_FILE" <<'EOF'
+INSTALL_HOSTS_RAW="$(join_by_comma "${HOSTS[@]}")"
+"$NODE_BIN" - "$INSTALL_TARGET_DIR/references/docmate.catalog.json" "$SCHEMA_VERSION" "$INSTALL_HOSTS_RAW" "$UPDATE_MODE" "$REPO_FILE" <<'EOF'
 const fs = require("node:fs");
 const path = require("node:path");
 
 const [, , catalogPath, schemaVersionRaw, hostsRaw, updateMode, repoFile] = process.argv;
-const installHosts = hostsRaw === "all"
-  ? ["openclaw", "claude-code", "opencode", "codex", "hermes"]
-  : hostsRaw.split(",").map((host) => host.trim()).filter(Boolean);
+const installHosts = hostsRaw.split(",").map((host) => host.trim()).filter(Boolean);
 
 const repos = fs.readFileSync(repoFile, "utf8")
   .split(/\r?\n/)
@@ -759,17 +1110,19 @@ const payload = {
 fs.writeFileSync(catalogPath, `${JSON.stringify(payload, null, 2)}\n`);
 EOF
 
-run_catalog_validator "$CANONICAL_DIR/references/docmate.catalog.json"
+run_catalog_validator "$INSTALL_TARGET_DIR/references/docmate.catalog.json"
 
-for host in "${HOSTS[@]}"; do
-  target="$(host_dir "$host")"
-  if [ "$target" = "$CANONICAL_DIR" ]; then
-    continue
-  fi
-  if prepare_target "$target"; then
-    ln -s "$CANONICAL_DIR" "$target"
-  fi
-done
+if [ "$INSTALL_STRATEGY" = "symlink" ]; then
+  for host in "${HOSTS[@]}"; do
+    target="$(host_dir "$host")"
+    if [ "$target" = "$CANONICAL_DIR" ]; then
+      continue
+    fi
+    if prepare_target "$target"; then
+      ln -s "$CANONICAL_DIR" "$target"
+    fi
+  done
+fi
 
-echo "DocMate installed to $CANONICAL_DIR"
-echo "Catalog: $CANONICAL_DIR/references/docmate.catalog.json"
+echo "DocMate installed to $INSTALL_TARGET_DIR"
+echo "Catalog: $INSTALL_TARGET_DIR/references/docmate.catalog.json"

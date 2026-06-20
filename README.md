@@ -8,8 +8,8 @@ request or GitLab merge request.
 ## What It Does
 
 - Installs as a skill for OpenClaw, Claude Code, OpenCode, Codex, and Hermes.
-- Uses `~/.agents/skills/docmate` as the canonical install; Codex reads that
-  canonical skill directory directly.
+- Uses `~/.agents/skills/docmate` as the canonical install for Global and
+  Custom installs; Codex reads that canonical skill directory directly.
 - Uses an agent-readable `docmate.catalog.json` as a repository catalog.
 - Routes to a configured repository path, then lets the agent discover
   documentation and related code evidence during the task.
@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/wufei-png/DocMate/main/scripts/inst
 Non-interactive install with explicit repositories:
 
 ```bash
-bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --hosts all --update-mode ask
+bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --update-mode ask
 ```
 
 Non-interactive install with repository auto scan:
@@ -40,11 +40,24 @@ Non-interactive install with repository auto scan:
 bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix
 ```
 
+Install target modes:
+
+- `global` (default): install once to `~/.agents/skills/docmate` and link
+  detected agent hosts.
+- `single`: install directly to one host, for example
+  `--install-mode single --hosts openclaw`.
+- `custom`: install once to `~/.agents/skills/docmate` and link the hosts
+  selected by `--hosts`, for example `--hosts openclaw,codex`.
+- `--hosts all` remains supported for script compatibility and selects every
+  supported host.
+
 Then edit:
 
 ```text
 ~/.agents/skills/docmate/references/docmate.catalog.json
 ```
+
+For `single` installs, use the `Catalog:` path printed by the installer instead.
 
 Add repository aliases, descriptions, base branch candidates, and update mode.
 The installer seeds `baseBranchCandidates` from each repository's detected

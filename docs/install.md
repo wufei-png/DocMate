@@ -12,7 +12,7 @@ curl -fsSL https://raw.githubusercontent.com/wufei-png/DocMate/main/scripts/inst
 Install from a local clone with explicit repositories:
 
 ```bash
-bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --hosts all --update-mode ask
+bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --update-mode ask
 ```
 
 Install from a local clone by scanning a repository prefix directory:
@@ -25,13 +25,24 @@ Use `--update-mode ask`, `--update-mode auto`, or `--update-mode off` to choose
 whether documentation repair asks before editing, opens PRs/MRs automatically
 for high-confidence gaps, or only reports gaps.
 
-The canonical install path is:
+Install target modes:
+
+- `global` (default): install once to `~/.agents/skills/docmate` and link
+  detected agent hosts.
+- `single`: install directly to one host, for example
+  `--install-mode single --hosts openclaw`.
+- `custom`: install once to `~/.agents/skills/docmate` and link the hosts
+  selected by `--hosts`, for example `--hosts openclaw,codex`.
+- `--hosts all` remains supported for script compatibility and selects every
+  supported host.
+
+The canonical install path for `global` and `custom` installs is:
 
 ```text
 ~/.agents/skills/docmate
 ```
 
-The installer links that directory into supported host skill locations for
+The installer links that directory into selected host skill locations for
 OpenClaw, Claude Code, OpenCode, and Hermes. Codex uses the canonical
 `~/.agents/skills/docmate` directory directly, so the `codex` host does not
 create a separate `~/.codex` link.
@@ -41,6 +52,8 @@ After installation, edit:
 ```text
 ~/.agents/skills/docmate/references/docmate.catalog.json
 ```
+
+For `single` installs, use the `Catalog:` path printed by the installer instead.
 
 `--project PATH` is still accepted as a backward-compatible alias for
 `--repo PATH`.

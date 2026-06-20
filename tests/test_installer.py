@@ -34,11 +34,18 @@ def run_install_args(
     extra_path: Optional[Path] = None,
     input_text: Optional[str] = None,
     timeout: int = 15,
+    fake_commands: Optional[List[str]] = None,
 ):
     env = os.environ.copy()
-    bin_dir = fake_bin(home, ["openclaw", "claude", "opencode", "codex", "hermes"])
+    if fake_commands is None:
+        fake_commands = ["openclaw", "claude", "opencode", "codex", "hermes"]
+    bin_dir = fake_bin(home, fake_commands)
+    node_executable = Path(node_path()) / "node"
+    node_wrapper = bin_dir / "node"
+    node_wrapper.write_text(f"#!/usr/bin/env bash\nexec {node_executable} \"$@\"\n")
+    node_wrapper.chmod(0o755)
     env["HOME"] = str(home)
-    path_entries = [str(bin_dir), node_path(), env["PATH"]]
+    path_entries = [str(bin_dir), "/usr/bin", "/bin"]
     if extra_path:
         path_entries.insert(0, str(extra_path))
     env["PATH"] = ":".join(path_entries)
@@ -121,6 +128,110 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     assert catalog["repos"][0]["path"] == str(repo)
     assert set(catalog["repos"][0]["update"]) == {"mode"}
     assert catalog["repos"][0]["update"]["mode"] == "ask"
+
+
+def test_yes_without_hosts_uses_global_detected_hosts(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--repo",
+            str(repo),
+            "--existing",
+            "backup",
+        ],
+        fake_commands=["opencode", "codex"],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    canonical = home / ".agents" / "skills" / "docmate"
+    assert (canonical / "SKILL.md").exists()
+    assert (home / ".config" / "opencode" / "skills" / "docmate").is_symlink()
+    assert not (home / ".openclaw" / "skills" / "docmate").exists()
+    assert not (home / ".claude" / "skills" / "docmate").exists()
+    assert not (home / ".hermes" / "skills" / "software-development" / "docmate").exists()
+
+    catalog = json.loads((canonical / "references" / "docmate.catalog.json").read_text())
+    assert catalog["installHosts"] == ["opencode", "codex"]
+
+
+def test_single_host_install_writes_directly_to_selected_host(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--repo",
+            str(repo),
+            "--install-mode",
+            "single",
+            "--hosts",
+            "openclaw",
+            "--existing",
+            "backup",
+        ],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    direct_target = home / ".openclaw" / "skills" / "docmate"
+    assert (direct_target / "SKILL.md").exists()
+    assert not direct_target.is_symlink()
+    assert not (home / ".agents" / "skills" / "docmate").exists()
+
+    catalog = json.loads((direct_target / "references" / "docmate.catalog.json").read_text())
+    assert catalog["installHosts"] == ["openclaw"]
+
+
+def test_duplicate_repo_names_keep_first_in_non_interactive_install(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo_a = tmp_path / "team-a" / "open-webui"
+    repo_b = tmp_path / "team-b" / "open-webui"
+    repo_a.mkdir(parents=True)
+    repo_b.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_a, check=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_b, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--repo",
+            str(repo_a),
+            "--repo",
+            str(repo_b),
+            "--hosts",
+            "codex",
+            "--existing",
+            "backup",
+        ],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "duplicate repository name detected: open-webui" in result.stdout
+    assert "duplicate repository name" not in result.stderr
+
+    catalog = json.loads(
+        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
+    )
+    assert [repo["path"] for repo in catalog["repos"]] == [str(repo_a)]
 
 
 def test_existing_host_directory_is_backed_up_before_linking(tmp_path):
