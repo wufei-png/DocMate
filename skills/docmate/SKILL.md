@@ -48,8 +48,7 @@ Use this shape:
 
 ```text
 Gap report
-Status: confirmed_gap | no_gap
-Confidence: high | medium | low
+Gap Confidence: high | medium | low
 Original question: <user question>
 Doc evidence: <paths or none found>
 Code evidence: <paths or commands checked>
