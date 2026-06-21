@@ -15,7 +15,7 @@ Space selects, and Enter selects or confirms depending on the menu.
 Install from a local clone with explicit repositories:
 
 ```bash
-bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --update-mode ask
+bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --update-mode auto
 ```
 
 Install from a local clone by scanning a repository prefix directory:
@@ -28,9 +28,10 @@ Auto scan defaults to depth `2`. In interactive installs, the installer asks for
 the scan depth after the prefix directory; for scripts, use `--scan-depth N` or
 `DOCMATE_SCAN_MAX_DEPTH=N`.
 
-Use `--update-mode ask`, `--update-mode auto`, or `--update-mode off` to choose
-whether documentation repair asks before editing, opens PRs/MRs automatically
-for high-confidence gaps, or only reports gaps.
+Use `--update-mode auto`, `--update-mode ask`, or `--update-mode off` to choose
+the global documentation repair mode. `auto` is the default and repairs only
+high-confidence confirmed gaps; `ask` always asks before editing docs or opening
+a PR/MR; `off` only reports gaps.
 
 Install target modes:
 
@@ -64,6 +65,10 @@ For `single` installs, use the `Catalog:` path printed by the installer instead.
 The generated `repos[].description` values are intentionally blank. Filling them
 in is optional, but project background or product scope can help agents route
 ambiguous requests.
+`repos[].aliases` is also optional and can list short names users may type.
+`repos[].baseBranchCandidates` is seeded from the detected remote default branch
+with `gh`, `glab`, or `git`, then local HEAD, then fallback `main`; edit it when
+documentation repair should target a different branch.
 
 `--project PATH` is still accepted as a backward-compatible alias for
 `--repo PATH`.

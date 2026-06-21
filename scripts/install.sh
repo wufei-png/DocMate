@@ -27,7 +27,8 @@ HOSTS_RAW=""
 HOSTS_ARG_SET=0
 INSTALL_MODE=""
 EXISTING="backup"
-UPDATE_MODE="ask"
+UPDATE_MODE="auto"
+UPDATE_MODE_ARG_SET=0
 AUTO_SCAN=0
 SCAN_ROOT=""
 REPO_ARGS=()
@@ -42,8 +43,8 @@ fi
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  install.sh [--yes] --repo PATH [--repo PATH ...] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off] [--scan-depth N]
-  install.sh [--yes] --auto-scan --scan-root PATH [--scan-depth N] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode ask|auto|off]
+  install.sh [--yes] --repo PATH [--repo PATH ...] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode auto|ask|off] [--scan-depth N]
+  install.sh [--yes] --auto-scan --scan-root PATH [--scan-depth N] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode auto|ask|off]
   install.sh
 
 Pipe install:
@@ -64,7 +65,7 @@ while [ "$#" -gt 0 ]; do
     --install-mode) INSTALL_MODE="${2:-}"; shift 2 ;;
     --hosts) HOSTS_RAW="${2:-}"; HOSTS_ARG_SET=1; shift 2 ;;
     --existing) EXISTING="${2:-}"; shift 2 ;;
-    --update-mode) UPDATE_MODE="${2:-}"; shift 2 ;;
+    --update-mode) UPDATE_MODE="${2:-}"; UPDATE_MODE_ARG_SET=1; shift 2 ;;
     -h|--help) usage ;;
     *) usage ;;
   esac
@@ -616,6 +617,50 @@ select_custom_hosts_interactive() {
       break
     fi
     echo "Please select at least one install host."
+  done
+}
+
+select_update_mode_interactive() {
+  local choice=""
+
+  if [ "$UPDATE_MODE_ARG_SET" -eq 1 ]; then
+    return
+  fi
+
+  if [ "$YES" -eq 1 ] || ! can_prompt; then
+    return
+  fi
+
+  if can_use_interactive_menu; then
+    MENU_LABELS=(
+      "Auto (default) - repair high-confidence confirmed gaps without asking"
+      "Ask - always ask before editing docs or opening a PR/MR"
+      "Off - only report gaps; never edit documentation"
+    )
+    MENU_VALUES=(auto ask off)
+    MENU_ENABLED=(1 1 1)
+    MENU_ROW_DETECTED=(0 0 0)
+    MENU_ALL_DETECTED_MODE=0
+    run_menu "Documentation repair mode" "single" "Please select one update mode."
+    UPDATE_MODE="$MENU_RESULT"
+    return
+  fi
+
+  echo "Documentation repair mode:"
+  echo "  [1] Auto (default) - repair high-confidence confirmed gaps without asking"
+  echo "  [2] Ask - always ask before editing docs or opening a PR/MR"
+  echo "  [3] Off - only report gaps; never edit documentation"
+  echo ""
+
+  while true; do
+    read_user_line "Enter choice [1-3, default 1]: "
+    choice="$REPLY"
+    case "$choice" in
+      ""|1) UPDATE_MODE="auto"; break ;;
+      2) UPDATE_MODE="ask"; break ;;
+      3) UPDATE_MODE="off"; break ;;
+      *) echo "Invalid choice. Please try again." ;;
+    esac
   done
 }
 
@@ -1488,6 +1533,8 @@ if [ "${#REPOS[@]}" -eq 0 ]; then
 fi
 
 resolve_duplicate_repo_names
+select_update_mode_interactive
+echo "Selected documentation repair mode: $UPDATE_MODE"
 select_install_targets
 
 if ! prepare_install_dir "$INSTALL_TARGET_DIR" "$INSTALL_MODE install target"; then
@@ -1525,9 +1572,6 @@ const repos = fs.readFileSync(repoFile, "utf8")
       path: repoPath,
       aliases: [],
       baseBranchCandidates: [defaultBranch],
-      update: {
-        mode: updateMode,
-      },
     };
   });
 
@@ -1564,8 +1608,13 @@ echo "Catalog: $INSTALL_TARGET_DIR/references/docmate.catalog.json"
 echo
 echo "============================================================"
 echo "Optional catalog enrichment"
-echo "Edit repos[].description in:"
+echo "Edit these optional routing fields in:"
 echo "  $INSTALL_TARGET_DIR/references/docmate.catalog.json"
-echo "Leaving it blank is valid. Adding project background, product scope,"
-echo "or documentation ownership helps agents understand the project better."
+echo "- repos[].description: project background, product scope, or doc ownership."
+echo "- repos[].aliases: short names users may type for the project."
+echo "- repos[].baseBranchCandidates: seeded from the detected remote default"
+echo "  branch via gh/glab/git, then local HEAD, then fallback main; edit it if"
+echo "  documentation repair should target another base branch."
+echo "- defaults.update.mode: global repair mode for all repos; current value:"
+echo "  $UPDATE_MODE"
 echo "============================================================"

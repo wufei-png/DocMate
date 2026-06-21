@@ -120,17 +120,10 @@ function validateUpdate(update, path) {
   if (!isObject(update)) {
     fail(`${path} must be an object`);
   }
-  const allowedKeys = new Set(["mode"]);
-  for (const key of Object.keys(update)) {
-    if (!allowedKeys.has(key)) {
-      fail(`${path}.${key} is not supported`);
-    }
-  }
-  if (update.mode !== undefined) {
-    requireString(update.mode, `${path}.mode`);
-    if (!supportedModes.has(update.mode)) {
-      fail("update.mode must be ask, auto, or off");
-    }
+  requireKeys(update, ["mode"], path);
+  requireString(update.mode, `${path}.mode`);
+  if (!supportedModes.has(update.mode)) {
+    fail("update.mode must be ask, auto, or off");
   }
 }
 
@@ -147,9 +140,12 @@ for (const [repoIndex, repo] of data.repos.entries()) {
   if (!isObject(repo)) {
     fail(`repos[${repoIndex}] must be an object`);
   }
+  if (Object.prototype.hasOwnProperty.call(repo, "update")) {
+    fail(`repos[${repoIndex}].update is not supported; use defaults.update.mode`);
+  }
   requireKeys(
     repo,
-    ["name", "description", "path", "aliases", "baseBranchCandidates", "update"],
+    ["name", "description", "path", "aliases", "baseBranchCandidates"],
     `repos[${repoIndex}]`
   );
 
@@ -184,10 +180,8 @@ for (const [repoIndex, repo] of data.repos.entries()) {
   }
 
   requireStringArray(repo.baseBranchCandidates, `repos[${repoIndex}].baseBranchCandidates`);
-  validateUpdate(repo.update, `repos[${repoIndex}].update`);
 
-  const effectiveMode = repo.update.mode || data.defaults.update.mode || "ask";
-  if (effectiveMode !== "off") {
+  if (data.defaults.update.mode !== "off") {
     if (repo.baseBranchCandidates.length === 0) {
       fail("baseBranchCandidates must contain at least one branch when updates are enabled");
     }

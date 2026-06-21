@@ -30,9 +30,9 @@ def test_skill_has_gap_report_and_update_mode_rules():
     content = SKILL.read_text()
 
     assert "Gap report" in content
-    assert "update.mode = ask" in content
-    assert "update.mode = auto" in content
-    assert "update.mode = off" in content
+    assert "defaults.update.mode = ask" in content
+    assert "defaults.update.mode = auto" in content
+    assert "defaults.update.mode = off" in content
     assert "already_fixed_upstream" in content
     assert "docmate_update.sh" not in content
 

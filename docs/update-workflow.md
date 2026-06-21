@@ -6,7 +6,7 @@ The safe path is:
 
 1. Answer the original question.
 2. Produce a gap report with document and code evidence.
-3. Follow `update.mode`.
+3. Follow `defaults.update.mode`.
 4. Create a temporary git worktree from a configured base branch.
 5. Re-check the gap in that worktree.
 6. Apply a doc-only fix.

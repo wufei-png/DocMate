@@ -12,19 +12,25 @@ Important fields:
 - `repos[].description`: optional project background. The installer leaves this
   blank by default; fill it in when product scope, ownership, or domain context
   would help the agent route vague requests.
+- `repos[].aliases`: optional short names users may type for this repository.
 - `baseBranchCandidates`: ordered base branches for documentation repair.
   DocMate tries these when creating a temporary repair worktree. The installer
-  seeds this from each repository's detected remote default branch; edit it
-  after installation when documentation repair should target a different branch
-  such as `develop`, `release/docs`, or `docs-main`.
-- `update.mode`: `ask`, `auto`, or `off`; the installer writes this from
-  `--update-mode`.
+  seeds this from each repository's detected remote default branch with `gh`,
+  `glab`, or `git`, then local HEAD, then fallback `main`; edit it after
+  installation when documentation repair should target a different branch such
+  as `develop`, `release/docs`, or `docs-main`.
+- `defaults.update.mode`: global documentation repair mode for all repositories.
+  `auto` is the installer default; use `ask` to require confirmation before any
+  edit, or `off` to report gaps without editing.
 
 `baseBranchCandidates` belongs in the catalog because the correct base branch is
 repository-specific and can differ between documentation repositories. Keep the
-most likely branch first. When `update.mode` is `ask` or `auto`, the validator
-requires at least one candidate so documentation repair has a deterministic
-starting point.
+most likely branch first. When `defaults.update.mode` is `ask` or `auto`, the
+validator requires at least one candidate so documentation repair has a
+deterministic starting point.
+
+Repository-level `update.mode` values are intentionally not supported. Repair
+behavior is one global install setting under `defaults.update.mode`.
 
 Each catalog entry should represent one git repository or working directory. If
 documentation is split across multiple independent repositories, add multiple

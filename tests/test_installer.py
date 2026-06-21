@@ -130,10 +130,12 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     assert catalog["repos"][0]["name"] == "docs-project"
     assert catalog["repos"][0]["description"] == ""
     assert catalog["repos"][0]["path"] == str(repo)
-    assert set(catalog["repos"][0]["update"]) == {"mode"}
-    assert catalog["repos"][0]["update"]["mode"] == "ask"
+    assert "update" not in catalog["repos"][0]
+    assert catalog["defaults"]["update"]["mode"] == "auto"
     assert "Optional catalog enrichment" in result.stdout
     assert "repos[].description" in result.stdout
+    assert "repos[].aliases" in result.stdout
+    assert "repos[].baseBranchCandidates" in result.stdout
 
 
 def test_yes_without_hosts_uses_global_detected_hosts(tmp_path):
@@ -227,7 +229,7 @@ def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
 
     command = (
         f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
-        f"--repo {shlex.quote(str(repo))} --install-mode single --existing overwrite"
+        f"--repo {shlex.quote(str(repo))} --update-mode auto --install-mode single --existing overwrite"
     )
     result = subprocess.run(
         ["script", "-qfec", command, "/dev/null"],
@@ -243,6 +245,51 @@ def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
     assert "Use Up/Down to move, Space or Enter to select." in result.stdout
     assert (home / ".config" / "opencode" / "skills" / "docmate" / "SKILL.md").exists()
     assert not (home / ".openclaw" / "skills" / "docmate").exists()
+
+
+def test_interactive_update_mode_menu_writes_global_default(tmp_path):
+    if not shutil.which("script"):
+        pytest.skip("script command is required for pseudo-tty installer test")
+
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    bin_dir = fake_bin(home, [])
+    node_executable = Path(node_path()) / "node"
+    node_wrapper = bin_dir / "node"
+    node_wrapper.write_text(f"#!/usr/bin/env bash\nexec {node_executable} \"$@\"\n")
+    node_wrapper.chmod(0o755)
+
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["PATH"] = f"{bin_dir}:/usr/bin:/bin"
+    env["DOCMATE_USE_LOCAL_CACHE"] = "true"
+    env["TERM"] = "xterm"
+
+    command = (
+        f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
+        f"--repo {shlex.quote(str(repo))} --hosts codex --existing overwrite"
+    )
+    result = subprocess.run(
+        ["script", "-qfec", command, "/dev/null"],
+        text=True,
+        input="\x1b[B\r",
+        capture_output=True,
+        env=env,
+        check=False,
+        timeout=15,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Documentation repair mode" in result.stdout
+    catalog = json.loads(
+        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
+    )
+    assert catalog["defaults"]["update"]["mode"] == "ask"
+    assert "update" not in catalog["repos"][0]
 
 
 def test_duplicate_repo_names_keep_first_in_non_interactive_install(tmp_path):
@@ -341,9 +388,11 @@ def test_installer_generates_valid_starter_catalog(tmp_path):
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert validate.returncode == 0, validate.stderr
-    repo_entry = json.loads(catalog.read_text())["repos"][0]
+    generated = json.loads(catalog.read_text())
+    repo_entry = generated["repos"][0]
     assert repo_entry["description"] == ""
-    assert repo_entry["update"] == {"mode": "ask"}
+    assert "update" not in repo_entry
+    assert generated["defaults"]["update"]["mode"] == "auto"
 
 
 def test_installer_writes_selected_update_mode(tmp_path):
@@ -360,7 +409,7 @@ def test_installer_writes_selected_update_mode(tmp_path):
         (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
     )
     assert catalog["defaults"]["update"]["mode"] == "auto"
-    assert catalog["repos"][0]["update"]["mode"] == "auto"
+    assert "update" not in catalog["repos"][0]
 
 
 def test_installer_uses_local_head_when_remote_default_is_unavailable(tmp_path):

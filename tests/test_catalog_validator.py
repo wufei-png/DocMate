@@ -25,7 +25,7 @@ def valid_catalog(tmp_path: Path) -> dict:
         "installHosts": ["openclaw", "claude-code", "opencode", "codex", "hermes"],
         "defaults": {
             "update": {
-                "mode": "ask",
+                "mode": "auto",
             }
         },
         "repos": [
@@ -35,9 +35,6 @@ def valid_catalog(tmp_path: Path) -> dict:
                 "path": str(docs),
                 "aliases": ["docs", "site"],
                 "baseBranchCandidates": ["main"],
-                "update": {
-                    "mode": "ask",
-                },
             },
             {
                 "name": "runbooks",
@@ -45,9 +42,6 @@ def valid_catalog(tmp_path: Path) -> dict:
                 "path": str(runbooks),
                 "aliases": ["ops-docs"],
                 "baseBranchCandidates": ["main"],
-                "update": {
-                    "mode": "auto",
-                },
             },
         ],
     }
@@ -128,21 +122,33 @@ def test_rejects_cross_repo_duplicate_aliases(tmp_path):
     assert "alias already used by repository docs-site: docs" in result.stderr
 
 
-def test_rejects_unsupported_update_keys(tmp_path):
+def test_rejects_repo_level_update_mode(tmp_path):
     payload = valid_catalog(tmp_path)
-    payload["repos"][0]["update"]["branchPrefix"] = "docmate/"
+    payload["repos"][0]["update"] = {"mode": "ask"}
     catalog_path = tmp_path / "docmate.catalog.json"
     write_catalog(catalog_path, payload)
 
     result = run_validator(catalog_path)
 
     assert result.returncode != 0
-    assert "repos[0].update.branchPrefix is not supported" in result.stderr
+    assert "repos[0].update is not supported; use defaults.update.mode" in result.stderr
+
+
+def test_rejects_unsupported_default_update_keys(tmp_path):
+    payload = valid_catalog(tmp_path)
+    payload["defaults"]["update"]["branchPrefix"] = "docmate/"
+    catalog_path = tmp_path / "docmate.catalog.json"
+    write_catalog(catalog_path, payload)
+
+    result = run_validator(catalog_path)
+
+    assert result.returncode != 0
+    assert "defaults.update must contain exactly these keys: mode" in result.stderr
 
 
 def test_rejects_invalid_update_mode(tmp_path):
     payload = valid_catalog(tmp_path)
-    payload["repos"][0]["update"]["mode"] = "always"
+    payload["defaults"]["update"]["mode"] = "always"
     catalog_path = tmp_path / "docmate.catalog.json"
     write_catalog(catalog_path, payload)
 
@@ -162,3 +168,16 @@ def test_rejects_empty_base_branches_when_update_enabled(tmp_path):
 
     assert result.returncode != 0
     assert "baseBranchCandidates must contain at least one branch when updates are enabled" in result.stderr
+
+
+def test_allows_empty_base_branches_when_update_off(tmp_path):
+    payload = valid_catalog(tmp_path)
+    payload["defaults"]["update"]["mode"] = "off"
+    payload["repos"][0]["baseBranchCandidates"] = []
+    catalog_path = tmp_path / "docmate.catalog.json"
+    write_catalog(catalog_path, payload)
+
+    result = run_validator(catalog_path)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "OK"

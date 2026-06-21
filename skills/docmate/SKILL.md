@@ -52,9 +52,11 @@ Only proceed to documentation repair when the gap is confirmed and the affected 
 
 ## Update Modes
 
-- `update.mode = ask`: Ask the user before any edit. Proceed only after explicit confirmation.
-- `update.mode = auto`: Proceed without asking only for a high-confidence confirmed gap with clear doc and code evidence.
-- `update.mode = off`: Report the gap and stop. Do not edit files.
+Read the global `defaults.update.mode` value from the catalog. Repository-level update modes are not supported.
+
+- `defaults.update.mode = ask`: Ask the user before any edit. Proceed only after explicit confirmation.
+- `defaults.update.mode = auto`: Proceed without asking only for a high-confidence confirmed gap with clear doc and code evidence.
+- `defaults.update.mode = off`: Report the gap and stop. Do not edit files.
 
 When updates are enabled, infer the hosting provider and push remote from the selected repository's git remotes and the available native tools. If the provider or remote is ambiguous, stop and report the blocker.
 
