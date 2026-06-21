@@ -15,10 +15,14 @@ request or GitLab merge request.
   documentation and related code evidence during the task.
 - Reports documentation gaps with document evidence, code evidence, affected
   docs, and confidence.
+- Uses a repair handoff template before documentation changes so evidence,
+  target docs, and intended minimal edits are explicit.
 - Supports `ask`, `auto`, and `off` modes for documentation repair.
 - Uses temporary git worktrees so documentation repair does not dirty the user's
   main checkout.
 - Opens GitHub PRs with `gh` and GitLab MRs with `glab`.
+- Includes repository-agnostic golden eval cases under `evals/` for docs-only
+  answers, stale docs, missing docs, defaults, and metrics labels.
 
 ## Quick Start
 

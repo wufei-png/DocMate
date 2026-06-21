@@ -114,6 +114,7 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     assert (canonical / "SKILL.md").exists()
     assert (canonical / "references" / "docmate.catalog.json").exists()
     assert not (canonical / "references" / "docmate.catalog.example.json").exists()
+    assert (canonical / "references" / "repair-handoff.template.md").exists()
     assert not (canonical / "references" / "docmate_update.sh").exists()
 
     expected_links = [

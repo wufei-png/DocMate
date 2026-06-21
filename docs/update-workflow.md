@@ -7,11 +7,12 @@ The safe path is:
 1. Answer the original question.
 2. Produce a gap report with document and code evidence.
 3. Follow `defaults.update.mode`.
-4. Create a temporary git worktree from a configured base branch.
-5. Re-check the gap in that worktree.
-6. Apply a doc-only fix.
-7. Review the changed files with `git status --short` and `git diff`.
-8. Commit, push, and open a GitHub PR or GitLab MR with native git tooling.
+4. Prepare the repair handoff from `references/repair-handoff.template.md`.
+5. Create a temporary git worktree from a configured base branch.
+6. Re-check the gap in that worktree.
+7. Apply a doc-only fix.
+8. Review the changed files with `git status --short` and `git diff`.
+9. Commit, push, and open a GitHub PR or GitLab MR with native git tooling.
 
 The skill does not require a helper script. A typical repair command sequence is:
 

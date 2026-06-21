@@ -30,6 +30,16 @@ def test_skill_has_gap_report_and_update_mode_rules():
     content = SKILL.read_text()
 
     assert "Gap report" in content
+    assert "Answer Decision Table" in content
+    assert "docs-only ok" in content
+    assert "must verify code" in content
+    assert "insufficient evidence" in content
+    assert "confirmed docs gap" in content
+    assert "Evidence chain" in content
+    assert "Docs evidence" in content
+    assert "Code evidence" in content
+    assert "External evidence" in content
+    assert "references/repair-handoff.template.md" in content
     assert "defaults.update.mode = ask" in content
     assert "defaults.update.mode = auto" in content
     assert "defaults.update.mode = off" in content
