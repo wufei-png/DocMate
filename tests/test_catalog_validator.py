@@ -67,6 +67,18 @@ def test_accepts_valid_catalog_with_multiple_repos(tmp_path):
     assert result.stdout.strip() == "OK"
 
 
+def test_accepts_empty_repo_description(tmp_path):
+    payload = valid_catalog(tmp_path)
+    payload["repos"][0]["description"] = ""
+    catalog_path = tmp_path / "docmate.catalog.json"
+    write_catalog(catalog_path, payload)
+
+    result = run_validator(catalog_path)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "OK"
+
+
 def test_rejects_relative_paths(tmp_path):
     payload = valid_catalog(tmp_path)
     payload["repos"][0]["path"] = "docs"

@@ -67,6 +67,8 @@ Then edit:
 For `single` installs, use the `Catalog:` path printed by the installer instead.
 
 Add repository aliases, descriptions, base branch candidates, and update mode.
+The installer leaves descriptions blank by default; filling them in is optional
+but helps agents understand project background and route vague requests.
 The installer seeds `baseBranchCandidates` from each repository's detected
 remote default branch; edit it only when the repair base should differ.
 

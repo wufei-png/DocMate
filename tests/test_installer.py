@@ -128,9 +128,12 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
 
     catalog = json.loads((canonical / "references" / "docmate.catalog.json").read_text())
     assert catalog["repos"][0]["name"] == "docs-project"
+    assert catalog["repos"][0]["description"] == ""
     assert catalog["repos"][0]["path"] == str(repo)
     assert set(catalog["repos"][0]["update"]) == {"mode"}
     assert catalog["repos"][0]["update"]["mode"] == "ask"
+    assert "Optional catalog enrichment" in result.stdout
+    assert "repos[].description" in result.stdout
 
 
 def test_yes_without_hosts_uses_global_detected_hosts(tmp_path):
@@ -338,7 +341,9 @@ def test_installer_generates_valid_starter_catalog(tmp_path):
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert validate.returncode == 0, validate.stderr
-    assert json.loads(catalog.read_text())["repos"][0]["update"] == {"mode": "ask"}
+    repo_entry = json.loads(catalog.read_text())["repos"][0]
+    assert repo_entry["description"] == ""
+    assert repo_entry["update"] == {"mode": "ask"}
 
 
 def test_installer_writes_selected_update_mode(tmp_path):

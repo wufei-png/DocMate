@@ -1521,7 +1521,7 @@ const repos = fs.readFileSync(repoFile, "utf8")
     const [repoPath, defaultBranch] = line.split("\t");
     return {
       name: path.basename(repoPath),
-      description: `Documentation repository at ${repoPath}. Edit this description and aliases for better routing.`,
+      description: "",
       path: repoPath,
       aliases: [],
       baseBranchCandidates: [defaultBranch],
@@ -1561,3 +1561,11 @@ fi
 
 echo "DocMate installed to $INSTALL_TARGET_DIR"
 echo "Catalog: $INSTALL_TARGET_DIR/references/docmate.catalog.json"
+echo
+echo "============================================================"
+echo "Optional catalog enrichment"
+echo "Edit repos[].description in:"
+echo "  $INSTALL_TARGET_DIR/references/docmate.catalog.json"
+echo "Leaving it blank is valid. Adding project background, product scope,"
+echo "or documentation ownership helps agents understand the project better."
+echo "============================================================"

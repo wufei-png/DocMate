@@ -61,6 +61,9 @@ After installation, edit:
 ```
 
 For `single` installs, use the `Catalog:` path printed by the installer instead.
+The generated `repos[].description` values are intentionally blank. Filling them
+in is optional, but project background or product scope can help agents route
+ambiguous requests.
 
 `--project PATH` is still accepted as a backward-compatible alias for
 `--repo PATH`.

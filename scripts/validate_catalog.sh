@@ -54,8 +54,11 @@ function requireKeys(object, keys, path) {
   }
 }
 
-function requireString(value, path) {
-  if (typeof value !== "string" || value.trim() === "") {
+function requireString(value, path, { allowEmpty = false } = {}) {
+  if (typeof value !== "string") {
+    fail(`${path} must be a string`);
+  }
+  if (!allowEmpty && value.trim() === "") {
     fail(`${path} must be a non-empty string`);
   }
 }
@@ -156,7 +159,7 @@ for (const [repoIndex, repo] of data.repos.entries()) {
   }
   seenRepoNames.add(repo.name);
 
-  requireString(repo.description, `repos[${repoIndex}].description`);
+  requireString(repo.description, `repos[${repoIndex}].description`, { allowEmpty: true });
   requireString(repo.path, `repos[${repoIndex}].path`);
   if (!repo.path.startsWith("/")) {
     fail(`repos[${repoIndex}].path must be an absolute path`);

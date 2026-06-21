@@ -9,6 +9,9 @@ Important fields:
 - `repos[].path`: repository path to use as the task working context. DocMate
   discovers documentation inside this repository and discovers related code
   repositories at execution time when verification requires it.
+- `repos[].description`: optional project background. The installer leaves this
+  blank by default; fill it in when product scope, ownership, or domain context
+  would help the agent route vague requests.
 - `baseBranchCandidates`: ordered base branches for documentation repair.
   DocMate tries these when creating a temporary repair worktree. The installer
   seeds this from each repository's detected remote default branch; edit it
