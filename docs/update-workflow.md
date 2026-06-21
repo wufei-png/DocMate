@@ -2,6 +2,20 @@
 
 DocMate repairs documentation only after a confirmed doc/code gap.
 
+## Design Decision: No Repair Subagent
+
+Documentation repair stays in the DocMate skill workflow instead of being split
+into a subagent. The repair path needs the selected repository, evidence chain,
+gap classification, user confirmation or `defaults.update.mode` state, and
+handoff context to remain in one responsibility boundary. Splitting this into a
+subagent would make it easier to lose repo context, evidence provenance, or the
+confirmation state that gates edits and PR/MR creation.
+
+A repair subagent should be reconsidered only after DocMate has an explicit
+serialized handoff contract and eval coverage proving that evidence, target
+repository, target docs, and user-confirmation state survive the handoff
+without ambiguity.
+
 The safe path is:
 
 1. Answer the original question.
