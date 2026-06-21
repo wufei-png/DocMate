@@ -29,11 +29,7 @@ When documentation and code conflict, treat code as the source of truth for runt
 1. Work from the selected repository `path`.
 2. Discover documentation in that repository before answering. Prefer obvious documentation entry points such as README files, `docs/`, documentation site content, runbooks, and links referenced by those files.
 3. Keep evidence explicit and concise. Cite the document, code, and external sources used; omit unused categories unless their absence matters. Label inference that combines sources.
-4. Classify the request with the answer decision table.
-5. If the decision is `docs-only ok`, answer directly from documentation with document evidence, then stop.
-6. If the decision is `must verify code`, verify implementation details, runtime behavior, defaults, field names, configuration, and unsupported or missing documentation claims from code evidence. If the related code repository is ambiguous, ask the user only after checking the current working directory, git remotes, links in the documentation, and nearby workspace repositories.
-7. If the decision is `insufficient evidence`, state what is unknown, cite what was checked, ask only for the missing repository or decision, then stop.
-8. If the decision is `confirmed docs gap`, choose the response order from `defaults.update.mode`: in `auto`, when the gap is high confidence, the target docs are clear, and the fix is a small doc-only change, documentation repair may run before the final answer; otherwise answer the user's question with evidence and a user-facing gap report first, then discuss repair.
+4. Classify the request and follow the answer decision table.
 
 ## Answer Decision Table
 
@@ -41,10 +37,10 @@ Use this decision table before answering:
 
 | Decision | When to use it | Required action |
 | --- | --- | --- |
-| `docs-only ok` | The documentation directly answers the question and the answer does not depend on runtime behavior, defaults, generated values, metrics, field names, or implementation details. | Answer from docs and cite document evidence. |
-| `must verify code` | The question involves implementation behavior, defaults, configuration precedence, API fields, metrics labels, supported values, or a documentation claim that could be stale. | Check code evidence before answering. |
-| `insufficient evidence` | Documentation and discovered code do not provide enough evidence, or the related code repository remains ambiguous after local discovery. | Say what is unknown, cite what was checked, and ask only for the missing repository or decision. |
-| `confirmed docs gap` | Documentation is missing, outdated, contradicted by code, or too vague, and code/document evidence identifies the affected docs. | Answer the user, produce a user-facing gap report, then follow `defaults.update.mode`. |
+| `docs-only ok` | The documentation directly answers the question and the answer does not depend on runtime behavior, defaults, generated values, metrics, field names, or implementation details. | Answer directly from documentation with document evidence, then stop. |
+| `must verify code` | The question involves implementation behavior, defaults, configuration precedence, API fields, metrics labels, supported values, or a documentation claim that could be stale. | Verify from code before answering. If the related code repository is ambiguous, ask only after checking the current working directory, git remotes, documentation links, and nearby workspace repositories. |
+| `insufficient evidence` | Documentation and discovered code do not provide enough evidence, or the related code repository remains ambiguous after local discovery. | State what is unknown, cite what was checked, ask only for the missing repository or decision, then stop. |
+| `confirmed docs gap` | Documentation is missing, outdated, contradicted by code, or too vague, and code/document evidence identifies the affected docs. | In `auto`, when the gap is high confidence, target docs are clear, and the fix is a small doc-only change, repair may run before the final answer. Otherwise answer with evidence and a user-facing gap report first, then discuss repair. |
 
 ## Gap report
 

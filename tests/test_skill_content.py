@@ -36,9 +36,9 @@ def test_skill_has_gap_report_and_update_mode_rules():
     assert "insufficient evidence" in content
     assert "confirmed docs gap" in content
     assert "Evidence Priority" in content
-    assert "If the decision is `docs-only ok`, answer directly" in content
-    assert "choose the response order from `defaults.update.mode`" in content
-    assert "documentation repair may run before the final answer" in content
+    assert "Classify the request and follow the answer decision table" in content
+    assert "Answer directly from documentation with document evidence" in content
+    assert "repair may run before the final answer" in content
     assert "a small doc-only fix" in content
     assert "Keep evidence explicit and concise" in content
     assert "source of truth for runtime behavior" in content
