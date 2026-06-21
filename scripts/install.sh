@@ -1544,7 +1544,6 @@ fi
 
 materialize_file "skills/docmate/SKILL.md" "$INSTALL_TARGET_DIR/SKILL.md"
 mkdir -p "$INSTALL_TARGET_DIR/references"
-materialize_file "skills/docmate/references/docmate.catalog.example.json" "$INSTALL_TARGET_DIR/references/docmate.catalog.example.json"
 
 NODE_BIN="$(find_node)"
 REPO_FILE="$(mktemp)"

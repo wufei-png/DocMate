@@ -113,6 +113,7 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     canonical = home / ".agents" / "skills" / "docmate"
     assert (canonical / "SKILL.md").exists()
     assert (canonical / "references" / "docmate.catalog.json").exists()
+    assert not (canonical / "references" / "docmate.catalog.example.json").exists()
     assert not (canonical / "references" / "docmate_update.sh").exists()
 
     expected_links = [
@@ -367,6 +368,7 @@ def test_existing_canonical_directory_is_backed_up_before_reinstall(tmp_path):
     assert (backup / "references" / "docmate.catalog.json").read_text() == '{"custom": true}\n'
     assert (canonical / "SKILL.md").exists()
     assert (canonical / "references" / "docmate.catalog.json").exists()
+    assert not (canonical / "references" / "docmate.catalog.example.json").exists()
 
 
 def test_installer_generates_valid_starter_catalog(tmp_path):
