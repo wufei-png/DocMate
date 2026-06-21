@@ -1544,7 +1544,6 @@ fi
 
 materialize_file "skills/docmate/SKILL.md" "$INSTALL_TARGET_DIR/SKILL.md"
 mkdir -p "$INSTALL_TARGET_DIR/references"
-materialize_file "skills/docmate/references/repair-handoff.template.md" "$INSTALL_TARGET_DIR/references/repair-handoff.template.md"
 
 NODE_BIN="$(find_node)"
 REPO_FILE="$(mktemp)"

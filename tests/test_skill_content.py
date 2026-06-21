@@ -35,16 +35,25 @@ def test_skill_has_gap_report_and_update_mode_rules():
     assert "must verify code" in content
     assert "insufficient evidence" in content
     assert "confirmed docs gap" in content
-    assert "Evidence chain" in content
-    assert "Docs evidence" in content
-    assert "Code evidence" in content
-    assert "External evidence" in content
-    assert "references/repair-handoff.template.md" in content
+    assert "Evidence Priority" in content
+    assert "If the decision is `docs-only ok`, answer directly" in content
+    assert "choose the response order from `defaults.update.mode`" in content
+    assert "documentation repair may run before the final answer" in content
+    assert "a small doc-only fix" in content
+    assert "Keep evidence explicit and concise" in content
+    assert "source of truth for runtime behavior" in content
+    assert "generated docs prove otherwise" in content
+    assert "Target docs repo" in content
     assert "defaults.update.mode = ask" in content
     assert "defaults.update.mode = auto" in content
     assert "defaults.update.mode = off" in content
     assert "already_fixed_upstream" in content
+    assert "do not ask again if the user already confirmed repair" in content
     assert "docmate_update.sh" not in content
+    assert "Evidence Chain" not in content
+    assert "Evidence chain" not in content
+    assert "repair-handoff.template.md" not in content
+    assert "Out of scope" not in content
 
 
 def test_skill_has_no_internal_project_terms():
