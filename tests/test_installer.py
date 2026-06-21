@@ -209,6 +209,48 @@ def test_single_host_install_writes_directly_to_selected_host(tmp_path):
     assert "installHosts" not in catalog
 
 
+def test_interactive_agent_platform_mode_menu_lists_supported_platforms(tmp_path):
+    if not shutil.which("script"):
+        pytest.skip("script command is required for pseudo-tty installer test")
+
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    bin_dir = fake_bin(home, [])
+    node_executable = Path(node_path()) / "node"
+    node_wrapper = bin_dir / "node"
+    node_wrapper.write_text(f"#!/usr/bin/env bash\nexec {node_executable} \"$@\"\n")
+    node_wrapper.chmod(0o755)
+
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["PATH"] = f"{bin_dir}:/usr/bin:/bin"
+    env["DOCMATE_USE_LOCAL_CACHE"] = "true"
+    env["TERM"] = "xterm"
+
+    command = (
+        f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
+        f"--repo {shlex.quote(str(repo))} --update-mode ask --existing overwrite"
+    )
+    result = subprocess.run(
+        ["script", "-qfec", command, "/dev/null"],
+        text=True,
+        input="\r",
+        capture_output=True,
+        env=env,
+        check=False,
+        timeout=15,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Agent platform mode" in result.stdout
+    assert "All detected agent platforms (recommended)" in result.stdout
+    assert "OpenClaw, Claude Code, OpenCode, Codex, Hermes" in result.stdout
+
+
 def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
     if not shutil.which("script"):
         pytest.skip("script command is required for pseudo-tty installer test")
@@ -247,6 +289,7 @@ def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Use Up/Down to move, Space or Enter to select." in result.stdout
+    assert "Select one agent platform" in result.stdout
     assert (home / ".config" / "opencode" / "skills" / "docmate" / "SKILL.md").exists()
     assert not (home / ".openclaw" / "skills" / "docmate").exists()
 

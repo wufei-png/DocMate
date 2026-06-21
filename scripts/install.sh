@@ -405,7 +405,7 @@ add_selected_host() {
   local host="$1"
 
   if ! is_supported_host "$host"; then
-    echo "Error: unsupported host: $host" >&2
+    echo "Error: unsupported agent platform: $host" >&2
     exit 1
   fi
   if ! array_contains "$host" "${HOSTS[@]}"; then
@@ -419,7 +419,7 @@ parse_hosts_raw() {
 
   HOSTS=()
   if [ -z "$raw_hosts" ]; then
-    echo "Error: --hosts requires at least one host or all" >&2
+    echo "Error: --hosts requires at least one agent platform or all" >&2
     exit 1
   fi
 
@@ -433,7 +433,7 @@ parse_hosts_raw() {
   done
 
   if [ "${#HOSTS[@]}" -eq 0 ]; then
-    echo "Error: --hosts did not select any supported host" >&2
+    echo "Error: --hosts did not select any supported agent platform" >&2
     exit 1
   fi
 }
@@ -449,7 +449,7 @@ select_detected_hosts() {
   done
 
   if [ "${#HOSTS[@]}" -eq 0 ]; then
-    echo "Warning: no supported agent host CLI detected; using Codex canonical install target."
+    echo "Warning: no supported agent platform CLI detected; using Codex canonical install target."
     HOSTS=(codex)
   fi
 }
@@ -458,7 +458,7 @@ print_host_summary() {
   local host
   local marker
 
-  echo "Install host status:"
+  echo "Agent platform status:"
   for host in "${SUPPORTED_HOSTS[@]}"; do
     marker="[ ]"
     if array_contains "$host" "${HOSTS[@]}"; then
@@ -480,7 +480,7 @@ build_host_menu_rows() {
   MENU_ROW_DETECTED=()
 
   if [ "$include_all" = "true" ]; then
-    MENU_LABELS+=("All detected hosts")
+    MENU_LABELS+=("All detected agent platforms")
     MENU_VALUES+=("all-detected")
     MENU_ENABLED+=(1)
     MENU_ROW_DETECTED+=(0)
@@ -503,23 +503,23 @@ select_install_mode_interactive() {
 
   if can_use_interactive_menu; then
     MENU_LABELS=(
-      "Global (recommended) - install to ~/.agents/skills and link detected hosts"
-      "Single host - install directly to one host"
-      "Custom hosts - install globally and link selected hosts"
+      "All detected agent platforms (recommended) - OpenClaw, Claude Code, OpenCode, Codex, Hermes"
+      "One agent platform - choose OpenClaw, Claude Code, OpenCode, Codex, or Hermes"
+      "Selected agent platforms - choose multiple from OpenClaw, Claude Code, OpenCode, Codex, Hermes"
     )
     MENU_VALUES=(global single custom)
     MENU_ENABLED=(1 1 1)
     MENU_ROW_DETECTED=(0 0 0)
     MENU_ALL_DETECTED_MODE=0
-    run_menu "Install target mode" "single" "Please select one install mode."
+    run_menu "Agent platform mode" "single" "Please select one agent platform mode."
     INSTALL_MODE="$MENU_RESULT"
     return
   fi
 
-  echo "Install target mode:"
-  echo "  [1] Global (recommended) - install to ~/.agents/skills and link detected hosts"
-  echo "  [2] Single host - install directly to one host"
-  echo "  [3] Custom hosts - install globally and link selected hosts"
+  echo "Agent platform mode:"
+  echo "  [1] All detected agent platforms (recommended) - OpenClaw, Claude Code, OpenCode, Codex, Hermes"
+  echo "  [2] One agent platform - choose OpenClaw, Claude Code, OpenCode, Codex, or Hermes"
+  echo "  [3] Selected agent platforms - choose multiple from OpenClaw, Claude Code, OpenCode, Codex, Hermes"
   echo ""
 
   while true; do
@@ -540,12 +540,12 @@ select_single_host_interactive() {
   if can_use_interactive_menu; then
     build_host_menu_rows "false"
     MENU_ALL_DETECTED_MODE=0
-    run_menu "Select one install host" "single" "Please select one install host."
+    run_menu "Select one agent platform" "single" "Please select one agent platform."
     HOSTS=("$MENU_RESULT")
     return
   fi
 
-  echo "Select one install host:"
+  echo "Select one agent platform:"
   echo "  [1] OpenClaw     ($(host_status_label "openclaw"))"
   echo "  [2] Claude Code  ($(host_status_label "claude-code"))"
   echo "  [3] OpenCode     ($(host_status_label "opencode"))"
@@ -574,14 +574,14 @@ select_custom_hosts_interactive() {
   if can_use_interactive_menu; then
     build_host_menu_rows "true"
     MENU_ALL_DETECTED_MODE=1
-    run_menu "Select install hosts" "multi" "Please select at least one install host."
+    run_menu "Select agent platforms" "multi" "Please select at least one agent platform."
     HOSTS=("${MENU_RESULTS[@]}")
     MENU_ALL_DETECTED_MODE=0
     return
   fi
 
-  echo "Select install hosts:"
-  echo "  [0] All detected hosts"
+  echo "Select agent platforms:"
+  echo "  [0] All detected agent platforms"
   echo "  [1] OpenClaw     ($(host_status_label "openclaw"))"
   echo "  [2] Claude Code  ($(host_status_label "claude-code"))"
   echo "  [3] OpenCode     ($(host_status_label "opencode"))"
@@ -611,7 +611,7 @@ select_custom_hosts_interactive() {
     if [ "${#HOSTS[@]}" -gt 0 ]; then
       break
     fi
-    echo "Please select at least one install host."
+    echo "Please select at least one agent platform."
   done
 }
 
@@ -680,14 +680,14 @@ select_install_targets() {
         ;;
       single)
         if [ "$YES" -eq 1 ] || ! can_prompt; then
-          echo "Error: --install-mode single requires --hosts HOST in non-interactive mode" >&2
+          echo "Error: --install-mode single requires --hosts PLATFORM in non-interactive mode" >&2
           exit 1
         fi
         select_single_host_interactive
         ;;
       custom)
         if [ "$YES" -eq 1 ] || ! can_prompt; then
-          echo "Error: --install-mode custom requires --hosts HOST[,HOST...] in non-interactive mode" >&2
+          echo "Error: --install-mode custom requires --hosts PLATFORM[,PLATFORM...] in non-interactive mode" >&2
           exit 1
         fi
         select_custom_hosts_interactive
@@ -697,7 +697,7 @@ select_install_targets() {
 
   if [ "$INSTALL_MODE" = "single" ]; then
     if [ "${#HOSTS[@]}" -ne 1 ]; then
-      echo "Error: single host install requires exactly one selected host" >&2
+      echo "Error: single platform install requires exactly one selected agent platform" >&2
       exit 1
     fi
     INSTALL_STRATEGY="direct"
@@ -799,7 +799,7 @@ host_dir() {
     opencode) printf '%s\n' "$HOME/.config/opencode/skills/$SKILL_SLUG" ;;
     codex) printf '%s\n' "$CANONICAL_DIR" ;;
     hermes) printf '%s\n' "$HOME/.hermes/skills/software-development/$SKILL_SLUG" ;;
-    *) echo "Error: unsupported host: $1" >&2; exit 1 ;;
+    *) echo "Error: unsupported agent platform: $1" >&2; exit 1 ;;
   esac
 }
 

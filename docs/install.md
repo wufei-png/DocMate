@@ -33,16 +33,16 @@ the global documentation repair mode. `ask` is the default and always asks
 before editing docs or opening a PR/MR; `auto` repairs only high-confidence
 confirmed gaps; `off` only reports gaps.
 
-Install target modes:
+Agent platform modes:
 
-- `global` (default): install once to `~/.agents/skills/docmate` and link
-  detected agent hosts.
-- `single`: install directly to one host, for example
+- `global` (default): install once to `~/.agents/skills/docmate` and enable all
+  detected agent platforms: OpenClaw, Claude Code, OpenCode, Codex, and Hermes.
+- `single`: install directly to one agent platform, for example
   `--install-mode single --hosts openclaw`.
-- `custom`: install once to `~/.agents/skills/docmate` and link the hosts
-  selected by `--hosts`, for example `--hosts openclaw,codex`.
+- `custom`: install once to `~/.agents/skills/docmate` and enable the agent
+  platforms selected by `--hosts`, for example `--hosts openclaw,codex`.
 - `--hosts all` remains supported for script compatibility and selects every
-  supported host.
+  supported agent platform.
 
 The canonical install path for `global` and `custom` installs is:
 
@@ -50,9 +50,9 @@ The canonical install path for `global` and `custom` installs is:
 ~/.agents/skills/docmate
 ```
 
-The installer links that directory into selected host skill locations for
-OpenClaw, Claude Code, OpenCode, and Hermes. Codex uses the canonical
-`~/.agents/skills/docmate` directory directly, so the `codex` host does not
+The installer links that directory into selected agent platform skill locations
+for OpenClaw, Claude Code, OpenCode, and Hermes. Codex uses the canonical
+`~/.agents/skills/docmate` directory directly, so the `codex` platform does not
 create a separate `~/.codex` link.
 
 After installation, edit:

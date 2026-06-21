@@ -1,7 +1,7 @@
 # DocMate
 
 DocMate is a skill-first documentation QA and documentation repair assistant for
-agent hosts. It helps an agent answer from project documentation, verify gaps
+agent platforms. It helps an agent answer from project documentation, verify gaps
 against code, and optionally repair documentation by opening a GitHub pull
 request or GitLab merge request.
 
@@ -49,16 +49,16 @@ Auto scan defaults to depth `2`. In interactive installs, the installer asks for
 the scan depth after the prefix directory; for scripts, use `--scan-depth N` or
 `DOCMATE_SCAN_MAX_DEPTH=N`.
 
-Install target modes:
+Agent platform modes:
 
-- `global` (default): install once to `~/.agents/skills/docmate` and link
-  detected agent hosts.
-- `single`: install directly to one host, for example
+- `global` (default): install once to `~/.agents/skills/docmate` and enable all
+  detected agent platforms: OpenClaw, Claude Code, OpenCode, Codex, and Hermes.
+- `single`: install directly to one agent platform, for example
   `--install-mode single --hosts openclaw`.
-- `custom`: install once to `~/.agents/skills/docmate` and link the hosts
-  selected by `--hosts`, for example `--hosts openclaw,codex`.
+- `custom`: install once to `~/.agents/skills/docmate` and enable the agent
+  platforms selected by `--hosts`, for example `--hosts openclaw,codex`.
 - `--hosts all` remains supported for script compatibility and selects every
-  supported host.
+  supported agent platform.
 
 Then edit:
 
