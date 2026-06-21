@@ -1,5 +1,9 @@
 # DocMate
 
+<p align="center">
+  <img src="imgs/cover.png" alt="DocMate Cover" width="100%">
+</p>
+
 DocMate is a skill-first documentation QA and documentation repair assistant for
 agent platforms. It helps an agent answer from project documentation, verify gaps
 against code, and optionally repair documentation by opening a GitHub pull
