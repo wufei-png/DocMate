@@ -130,10 +130,12 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
 
     catalog = json.loads((canonical / "references" / "docmate.catalog.json").read_text())
     assert catalog["repos"][0]["name"] == "docs-project"
-    assert catalog["repos"][0]["description"] == ""
     assert catalog["repos"][0]["path"] == str(repo)
+    assert "description" not in catalog["repos"][0]
+    assert "aliases" not in catalog["repos"][0]
     assert "update" not in catalog["repos"][0]
-    assert catalog["defaults"]["update"]["mode"] == "auto"
+    assert "installHosts" not in catalog
+    assert catalog["defaults"]["update"]["mode"] == "ask"
     assert "Optional catalog enrichment" in result.stdout
     assert "repos[].description" in result.stdout
     assert "repos[].aliases" in result.stdout
@@ -170,7 +172,7 @@ def test_yes_without_hosts_uses_global_detected_hosts(tmp_path):
     assert not (home / ".hermes" / "skills" / "software-development" / "docmate").exists()
 
     catalog = json.loads((canonical / "references" / "docmate.catalog.json").read_text())
-    assert catalog["installHosts"] == ["opencode", "codex"]
+    assert "installHosts" not in catalog
 
 
 def test_single_host_install_writes_directly_to_selected_host(tmp_path):
@@ -204,7 +206,7 @@ def test_single_host_install_writes_directly_to_selected_host(tmp_path):
     assert not (home / ".agents" / "skills" / "docmate").exists()
 
     catalog = json.loads((direct_target / "references" / "docmate.catalog.json").read_text())
-    assert catalog["installHosts"] == ["openclaw"]
+    assert "installHosts" not in catalog
 
 
 def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
@@ -278,7 +280,7 @@ def test_interactive_update_mode_menu_writes_global_default(tmp_path):
     result = subprocess.run(
         ["script", "-qfec", command, "/dev/null"],
         text=True,
-        input="\x1b[B\r",
+        input="\r",
         capture_output=True,
         env=env,
         check=False,
@@ -393,9 +395,11 @@ def test_installer_generates_valid_starter_catalog(tmp_path):
     assert validate.returncode == 0, validate.stderr
     generated = json.loads(catalog.read_text())
     repo_entry = generated["repos"][0]
-    assert repo_entry["description"] == ""
+    assert "description" not in repo_entry
+    assert "aliases" not in repo_entry
     assert "update" not in repo_entry
-    assert generated["defaults"]["update"]["mode"] == "auto"
+    assert "installHosts" not in generated
+    assert generated["defaults"]["update"]["mode"] == "ask"
 
 
 def test_installer_writes_selected_update_mode(tmp_path):

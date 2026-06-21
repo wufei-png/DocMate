@@ -7,10 +7,11 @@ SKILL = ROOT / "skills" / "docmate" / "SKILL.md"
 
 def test_skill_frontmatter_and_trigger_description_cover_docmate_workflow():
     content = SKILL.read_text()
+    lowered = content.lower()
 
     assert "name: docmate" in content
-    assert "documentation QA" in content
-    assert "documentation gaps" in content
+    assert "documentation qa" in lowered
+    assert "documentation gaps" in lowered
     assert "pull request" in content
     assert "merge request" in content
 

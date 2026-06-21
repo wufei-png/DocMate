@@ -36,7 +36,7 @@ Space selects, and Enter selects or confirms depending on the menu.
 Non-interactive install with explicit repositories:
 
 ```bash
-bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo --update-mode auto
+bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo
 ```
 
 Non-interactive install with repository auto scan:
@@ -69,14 +69,13 @@ Then edit:
 For `single` installs, use the `Catalog:` path printed by the installer instead.
 
 Add repository aliases, descriptions, and base branch candidates as needed.
-The installer leaves descriptions blank by default; filling them in is optional
-but helps agents understand project background and route vague requests.
-Aliases are optional short names users may type for a repository.
+Descriptions and aliases are optional catalog fields. Add them when project
+background or short names would help agents route vague requests.
 The installer seeds `baseBranchCandidates` from each repository's detected
 remote default branch with `gh`, `glab`, or `git`, then falls back to local HEAD
 and finally `main`; edit it only when the repair base should differ.
 The global repair behavior lives in `defaults.update.mode` and defaults to
-`auto`.
+`ask`.
 
 ## Validation
 

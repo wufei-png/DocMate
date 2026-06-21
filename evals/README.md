@@ -17,3 +17,21 @@ Each JSONL entry contains:
 - `expectedEvidence`: required evidence categories.
 - `expectedRepair`: whether documentation repair is allowed.
 - `notes`: what the case is meant to catch.
+
+Validate the cases:
+
+```bash
+python3 evals/run_forward_tests.py
+```
+
+Generate blind prompts for a fresh agent:
+
+```bash
+python3 evals/run_forward_tests.py --write-prompts /tmp/docmate-prompts
+```
+
+Grade JSONL responses from that run:
+
+```bash
+python3 evals/run_forward_tests.py --responses /tmp/docmate-responses.jsonl
+```

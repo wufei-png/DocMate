@@ -5,13 +5,11 @@ description: "Documentation QA assistant that answers from project docs and code
 
 # DocMate
 
-Use this skill for documentation QA, project documentation lookup, doc-vs-code verification, documentation gaps, and documentation repair requests.
-
 ## Required Catalog Step
 
 Read `references/docmate.catalog.json` before selecting a repository. Do not guess from the current directory when the user has not named a repository.
 
-Choose the repository by comparing the user's request with each catalog entry:
+Choose the repository by comparing the user's request with these catalog fields when present:
 
 - `name`
 - `description`
@@ -28,7 +26,7 @@ When documentation and code conflict, treat code as the source of truth for runt
 
 1. Work from the selected repository `path`.
 2. Discover documentation in that repository before answering. Prefer obvious documentation entry points such as README files, `docs/`, documentation site content, runbooks, and links referenced by those files.
-3. Keep evidence explicit and concise. Cite the document, code, and external sources used; omit unused categories unless their absence matters. Label inference that combines sources.
+3. Keep evidence explicit and concise. Cite the document and code evidence used; cite external sources only when requested or necessary. Omit unused categories unless their absence matters. Label inference that combines sources.
 4. Classify the request and follow the answer decision table.
 
 ## Answer Decision Table

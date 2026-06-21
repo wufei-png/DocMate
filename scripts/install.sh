@@ -27,7 +27,7 @@ HOSTS_RAW=""
 HOSTS_ARG_SET=0
 INSTALL_MODE=""
 EXISTING="backup"
-UPDATE_MODE="auto"
+UPDATE_MODE="ask"
 UPDATE_MODE_ARG_SET=0
 AUTO_SCAN=0
 SCAN_ROOT=""
@@ -360,11 +360,6 @@ array_contains() {
   return 1
 }
 
-join_by_comma() {
-  local IFS=","
-  printf '%s\n' "$*"
-}
-
 host_command() {
   case "$1" in
     openclaw) printf '%s\n' "openclaw" ;;
@@ -633,11 +628,11 @@ select_update_mode_interactive() {
 
   if can_use_interactive_menu; then
     MENU_LABELS=(
-      "Auto (default) - repair high-confidence confirmed gaps without asking"
-      "Ask - always ask before editing docs or opening a PR/MR"
+      "Ask (default) - always ask before editing docs or opening a PR/MR"
+      "Auto - repair high-confidence confirmed gaps without asking"
       "Off - only report gaps; never edit documentation"
     )
-    MENU_VALUES=(auto ask off)
+    MENU_VALUES=(ask auto off)
     MENU_ENABLED=(1 1 1)
     MENU_ROW_DETECTED=(0 0 0)
     MENU_ALL_DETECTED_MODE=0
@@ -647,8 +642,8 @@ select_update_mode_interactive() {
   fi
 
   echo "Documentation repair mode:"
-  echo "  [1] Auto (default) - repair high-confidence confirmed gaps without asking"
-  echo "  [2] Ask - always ask before editing docs or opening a PR/MR"
+  echo "  [1] Ask (default) - always ask before editing docs or opening a PR/MR"
+  echo "  [2] Auto - repair high-confidence confirmed gaps without asking"
   echo "  [3] Off - only report gaps; never edit documentation"
   echo ""
 
@@ -656,8 +651,8 @@ select_update_mode_interactive() {
     read_user_line "Enter choice [1-3, default 1]: "
     choice="$REPLY"
     case "$choice" in
-      ""|1) UPDATE_MODE="auto"; break ;;
-      2) UPDATE_MODE="ask"; break ;;
+      ""|1) UPDATE_MODE="ask"; break ;;
+      2) UPDATE_MODE="auto"; break ;;
       3) UPDATE_MODE="off"; break ;;
       *) echo "Invalid choice. Please try again." ;;
     esac
@@ -1552,13 +1547,11 @@ for repo_path in "${REPOS[@]}"; do
   printf '%s\t%s\n' "$repo_path" "$(detect_default_branch "$repo_path")" >> "$REPO_FILE"
 done
 
-INSTALL_HOSTS_RAW="$(join_by_comma "${HOSTS[@]}")"
-"$NODE_BIN" - "$INSTALL_TARGET_DIR/references/docmate.catalog.json" "$SCHEMA_VERSION" "$INSTALL_HOSTS_RAW" "$UPDATE_MODE" "$REPO_FILE" <<'EOF'
+"$NODE_BIN" - "$INSTALL_TARGET_DIR/references/docmate.catalog.json" "$SCHEMA_VERSION" "$UPDATE_MODE" "$REPO_FILE" <<'EOF'
 const fs = require("node:fs");
 const path = require("node:path");
 
-const [, , catalogPath, schemaVersionRaw, hostsRaw, updateMode, repoFile] = process.argv;
-const installHosts = hostsRaw.split(",").map((host) => host.trim()).filter(Boolean);
+const [, , catalogPath, schemaVersionRaw, updateMode, repoFile] = process.argv;
 
 const repos = fs.readFileSync(repoFile, "utf8")
   .split(/\r?\n/)
@@ -1567,16 +1560,13 @@ const repos = fs.readFileSync(repoFile, "utf8")
     const [repoPath, defaultBranch] = line.split("\t");
     return {
       name: path.basename(repoPath),
-      description: "",
       path: repoPath,
-      aliases: [],
       baseBranchCandidates: [defaultBranch],
     };
   });
 
 const payload = {
   schemaVersion: Number(schemaVersionRaw),
-  installHosts,
   defaults: {
     update: {
       mode: updateMode,

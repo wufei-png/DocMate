@@ -22,25 +22,20 @@ def valid_catalog(tmp_path: Path) -> dict:
     runbooks.mkdir()
     return {
         "schemaVersion": 2,
-        "installHosts": ["openclaw", "claude-code", "opencode", "codex", "hermes"],
         "defaults": {
             "update": {
-                "mode": "auto",
+                "mode": "ask",
             }
         },
         "repos": [
             {
                 "name": "docs-site",
-                "description": "Public documentation site.",
                 "path": str(docs),
-                "aliases": ["docs", "site"],
                 "baseBranchCandidates": ["main"],
             },
             {
                 "name": "runbooks",
-                "description": "Operational runbooks.",
                 "path": str(runbooks),
-                "aliases": ["ops-docs"],
                 "baseBranchCandidates": ["main"],
             },
         ],
@@ -61,9 +56,22 @@ def test_accepts_valid_catalog_with_multiple_repos(tmp_path):
     assert result.stdout.strip() == "OK"
 
 
-def test_accepts_empty_repo_description(tmp_path):
+def test_accepts_optional_repo_description_and_aliases(tmp_path):
     payload = valid_catalog(tmp_path)
     payload["repos"][0]["description"] = ""
+    payload["repos"][0]["aliases"] = ["docs", "site"]
+    catalog_path = tmp_path / "docmate.catalog.json"
+    write_catalog(catalog_path, payload)
+
+    result = run_validator(catalog_path)
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "OK"
+
+
+def test_accepts_legacy_install_hosts(tmp_path):
+    payload = valid_catalog(tmp_path)
+    payload["installHosts"] = ["openclaw", "claude-code", "opencode", "codex", "hermes"]
     catalog_path = tmp_path / "docmate.catalog.json"
     write_catalog(catalog_path, payload)
 

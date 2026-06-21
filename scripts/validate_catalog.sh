@@ -54,6 +54,21 @@ function requireKeys(object, keys, path) {
   }
 }
 
+function requireKeysWithOptional(object, requiredKeys, optionalKeys, path) {
+  const required = new Set(requiredKeys);
+  const allowed = new Set([...requiredKeys, ...optionalKeys]);
+  for (const key of required) {
+    if (!Object.prototype.hasOwnProperty.call(object, key)) {
+      fail(`${path} is missing required key: ${key}`);
+    }
+  }
+  for (const key of Object.keys(object)) {
+    if (!allowed.has(key)) {
+      fail(`${path} contains unsupported key: ${key}`);
+    }
+  }
+}
+
 function requireString(value, path, { allowEmpty = false } = {}) {
   if (typeof value !== "string") {
     fail(`${path} must be a string`);
@@ -93,17 +108,19 @@ if (!isObject(data)) {
   fail("root must be a JSON object");
 }
 
-requireKeys(data, ["schemaVersion", "installHosts", "defaults", "repos"], "root");
+requireKeysWithOptional(data, ["schemaVersion", "defaults", "repos"], ["installHosts"], "root");
 
 if (data.schemaVersion !== 2) {
   fail("schemaVersion must be 2");
 }
 
 const supportedHosts = new Set(["openclaw", "claude-code", "opencode", "codex", "hermes"]);
-requireStringArray(data.installHosts, "installHosts", { allowEmpty: false });
-for (const [index, host] of data.installHosts.entries()) {
-  if (!supportedHosts.has(host)) {
-    fail(`installHosts[${index}] has an unsupported host: ${host}`);
+if (Object.prototype.hasOwnProperty.call(data, "installHosts")) {
+  requireStringArray(data.installHosts, "installHosts", { allowEmpty: false });
+  for (const [index, host] of data.installHosts.entries()) {
+    if (!supportedHosts.has(host)) {
+      fail(`installHosts[${index}] has an unsupported host: ${host}`);
+    }
   }
 }
 
@@ -143,9 +160,10 @@ for (const [repoIndex, repo] of data.repos.entries()) {
   if (Object.prototype.hasOwnProperty.call(repo, "update")) {
     fail(`repos[${repoIndex}].update is not supported; use defaults.update.mode`);
   }
-  requireKeys(
+  requireKeysWithOptional(
     repo,
-    ["name", "description", "path", "aliases", "baseBranchCandidates"],
+    ["name", "path", "baseBranchCandidates"],
+    ["description", "aliases"],
     `repos[${repoIndex}]`
   );
 
@@ -155,7 +173,9 @@ for (const [repoIndex, repo] of data.repos.entries()) {
   }
   seenRepoNames.add(repo.name);
 
-  requireString(repo.description, `repos[${repoIndex}].description`, { allowEmpty: true });
+  if (Object.prototype.hasOwnProperty.call(repo, "description")) {
+    requireString(repo.description, `repos[${repoIndex}].description`, { allowEmpty: true });
+  }
   requireString(repo.path, `repos[${repoIndex}].path`);
   if (!repo.path.startsWith("/")) {
     fail(`repos[${repoIndex}].path must be an absolute path`);
@@ -165,18 +185,20 @@ for (const [repoIndex, repo] of data.repos.entries()) {
   }
   seenRepoPaths.add(repo.path);
 
-  requireStringArray(repo.aliases, `repos[${repoIndex}].aliases`);
-  const seenAliases = new Set();
-  for (const alias of repo.aliases) {
-    if (seenAliases.has(alias)) {
-      fail(`repos[${repoIndex}] contains a duplicate alias: ${alias}`);
+  if (Object.prototype.hasOwnProperty.call(repo, "aliases")) {
+    requireStringArray(repo.aliases, `repos[${repoIndex}].aliases`);
+    const seenAliases = new Set();
+    for (const alias of repo.aliases) {
+      if (seenAliases.has(alias)) {
+        fail(`repos[${repoIndex}] contains a duplicate alias: ${alias}`);
+      }
+      if (seenRepoAliases.has(alias)) {
+        const firstRepoName = seenRepoAliases.get(alias);
+        fail(`repos[${repoIndex}].aliases contains alias already used by repository ${firstRepoName}: ${alias}`);
+      }
+      seenAliases.add(alias);
+      seenRepoAliases.set(alias, repo.name);
     }
-    if (seenRepoAliases.has(alias)) {
-      const firstRepoName = seenRepoAliases.get(alias);
-      fail(`repos[${repoIndex}].aliases contains alias already used by repository ${firstRepoName}: ${alias}`);
-    }
-    seenAliases.add(alias);
-    seenRepoAliases.set(alias, repo.name);
   }
 
   requireStringArray(repo.baseBranchCandidates, `repos[${repoIndex}].baseBranchCandidates`);
