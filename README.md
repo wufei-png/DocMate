@@ -9,6 +9,78 @@ agent platforms. It helps an agent answer from project documentation, verify gap
 against code, and optionally repair documentation by opening a GitHub pull
 request or GitLab merge request.
 
+## Workflow
+
+```mermaid
+flowchart TD
+    Start([User asks a documentation question])
+
+    subgraph Setup["Install and routing setup"]
+        Install[Install DocMate skill]
+        Catalog[Create or edit docmate.catalog.json]
+        RepoFields[Add repository path, aliases, description, and baseBranchCandidates]
+        Mode[Set defaults.update.mode: ask, auto, or off]
+        Install --> Catalog --> RepoFields --> Mode
+    end
+
+    Start --> ReadCatalog[Read references/docmate.catalog.json]
+    Mode -.->|provides routing and repair policy| ReadCatalog
+    ReadCatalog --> SelectRepo{Can one repository be selected clearly?}
+    SelectRepo -->|No| AskRepo[Ask user to choose the repository]
+    AskRepo --> ReadCatalog
+    SelectRepo -->|Yes| DiscoverDocs[Discover README, docs, runbooks, and linked docs]
+
+    DiscoverDocs --> Classify{Classify the request}
+
+    Classify -->|docs-only ok| AnswerDocs[Answer from documentation evidence]
+    AnswerDocs --> Done([Done])
+
+    Classify -->|must verify code| VerifyCode[Check related code evidence]
+    VerifyCode --> EnoughEvidence{Enough evidence to answer?}
+    EnoughEvidence -->|No| Insufficient[Report insufficient evidence and blocker]
+    Insufficient --> Done
+    EnoughEvidence -->|Yes| Conflict{Docs missing, stale, or too vague?}
+    Conflict -->|No| AnswerWithEvidence[Answer with document and code evidence]
+    AnswerWithEvidence --> Done
+
+    Classify -->|insufficient evidence| Insufficient
+    Classify -->|confirmed docs gap| GapReport
+    Conflict -->|Yes| GapReport[Produce gap report]
+
+    GapReport --> UpdateMode{defaults.update.mode}
+    UpdateMode -->|off| StopNoEdit[Stop after reporting; do not edit docs]
+    StopNoEdit --> Done
+
+    UpdateMode -->|ask| Confirm{Did user confirm repair?}
+    Confirm -->|No| WaitConfirm[Wait for explicit confirmation]
+    WaitConfirm --> Done
+    Confirm -->|Yes| RepairReady[Proceed to isolated repair]
+
+    UpdateMode -->|auto| AutoAllowed{High-confidence, clear target, small doc-only fix?}
+    AutoAllowed -->|No| StopNoEdit
+    AutoAllowed -->|Yes| RepairReady
+
+    RepairReady --> ResolveBase[Resolve base branch from baseBranchCandidates]
+    ResolveBase --> Worktree[Create temporary git worktree]
+    Worktree --> Recheck[Recheck target docs against confirmed gap]
+    Recheck --> AlreadyFixed{Already fixed upstream?}
+    AlreadyFixed -->|Yes| UpstreamFixed[Stop with already_fixed_upstream]
+    UpstreamFixed --> Done
+    AlreadyFixed -->|No| EditDocs[Apply smallest doc-only fix]
+    EditDocs --> ReviewPatch[Review git status and git diff]
+    ReviewPatch --> CleanPatch{Only intended docs changed?}
+    CleanPatch -->|No| Blocker[Stop and report blocker]
+    Blocker --> Done
+    CleanPatch -->|Yes| Commit[Commit documentation fix]
+    Commit --> Publish[Push branch]
+    Publish --> Provider{Hosting provider}
+    Provider -->|GitHub| OpenPR[Open pull request with gh]
+    Provider -->|GitLab| OpenMR[Open merge request with glab]
+    Provider -->|Ambiguous| Blocker
+    OpenPR --> Done
+    OpenMR --> Done
+```
+
 ## What It Does
 
 - Installs as a skill for OpenClaw, Claude Code, OpenCode, Codex, and Hermes.
