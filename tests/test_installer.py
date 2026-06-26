@@ -190,6 +190,38 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     assert "repos[].baseBranchCandidates" in result.stdout
 
 
+def test_non_interactive_install_defaults_to_english_skill(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install(home, repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    skill = (home / ".agents" / "skills" / "docmate" / "SKILL.md").read_text()
+    assert "Required Catalog Step" in skill
+    assert "必读 Catalog 步骤" not in skill
+    assert "Deployed English DocMate skill." in result.stdout
+
+
+def test_non_interactive_language_zh_deploys_chinese_skill(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install(home, repo, ["--language", "zh"])
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    skill = (home / ".agents" / "skills" / "docmate" / "SKILL.md").read_text()
+    assert "必读 Catalog 步骤" in skill
+    assert "Required Catalog Step" not in skill
+    assert "Deployed Chinese DocMate skill." in result.stdout
+
+
 def test_yes_without_hosts_uses_global_detected_hosts(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
@@ -280,9 +312,10 @@ def test_interactive_agent_platform_mode_menu_lists_supported_platforms(tmp_path
         f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
         f"--repo {shlex.quote(str(repo))} --update-mode ask --existing overwrite"
     )
-    result = run_pty_command(command, "\r", env)
+    result = run_pty_command(command, "\r\r", env)
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "Skill language / 选择语言" in result.stdout
     assert "Agent platform mode" in result.stdout
     assert "All detected agent platforms (recommended)" in result.stdout
     assert "OpenClaw, Claude Code, OpenCode, Codex, Hermes" in result.stdout
@@ -311,9 +344,10 @@ def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
         f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
         f"--repo {shlex.quote(str(repo))} --update-mode auto --install-mode single --existing overwrite"
     )
-    result = run_pty_command(command, "\x1b[B\x1b[B\r", env)
+    result = run_pty_command(command, "\r\x1b[B\x1b[B\r", env)
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "Skill language / 选择语言" in result.stdout
     assert "Use Up/Down to move, Space or Enter to select." in result.stdout
     assert "Select one agent platform" in result.stdout
     assert (home / ".config" / "opencode" / "skills" / "docmate" / "SKILL.md").exists()
@@ -343,9 +377,10 @@ def test_interactive_update_mode_menu_writes_global_default(tmp_path):
         f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
         f"--repo {shlex.quote(str(repo))} --hosts codex --existing overwrite"
     )
-    result = run_pty_command(command, "\r", env)
+    result = run_pty_command(command, "\r\r", env)
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "Skill language / 选择语言" in result.stdout
     assert "Documentation repair mode" in result.stdout
     catalog = json.loads(
         (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()

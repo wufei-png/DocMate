@@ -3,6 +3,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "docmate" / "SKILL.md"
+SKILL_EN = ROOT / "skills" / "docmate" / "SKILL.en.md"
+SKILL_ZH = ROOT / "skills" / "docmate" / "SKILL.zh.md"
 
 
 def test_skill_frontmatter_and_trigger_description_cover_docmate_workflow():
@@ -16,6 +18,18 @@ def test_skill_frontmatter_and_trigger_description_cover_docmate_workflow():
     assert "documentation gaps" in lowered
     assert "pull request" in content
     assert "merge request" in content
+
+
+def test_language_skill_templates_are_installable_docmate_skills():
+    english = SKILL_EN.read_text()
+    chinese = SKILL_ZH.read_text()
+
+    assert "name: docmate" in english
+    assert "name: docmate" in chinese
+    assert "Required Catalog Step" in english
+    assert "必读 Catalog 步骤" in chinese
+    assert "references/docmate.catalog.json" in english
+    assert "references/docmate.catalog.json" in chinese
 
 
 def test_skill_requires_catalog_before_repo_selection():

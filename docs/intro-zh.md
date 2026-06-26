@@ -21,7 +21,7 @@ DocMate 把这件事收成几步：
 
 DocMate 的核心是一份 skill。里面写清楚 Agent 怎么选仓库、先看哪些文档、什么时候必须看代码、怎么判断文档缺口，以及修复时如何控制范围。
 
-安装流程支持 OpenClaw、Claude Code、OpenCode、Codex 和 Hermes。全局和自定义安装都使用 `~/.agents/skills/docmate`，避免每个平台放一份不同的规则。
+安装流程支持 OpenClaw、Claude Code、OpenCode、Codex 和 Hermes。全局和自定义安装都使用 `~/.agents/skills/docmate`，避免每个平台放一份不同的规则。安装器支持中文和英文 skill 模板：交互安装会询问语言；非交互安装默认英文，如需中文可加 `--language zh`。
 
 ### 用 catalog 找项目
 
@@ -29,6 +29,12 @@ DocMate 用 `docmate.catalog.json` 记录项目路径、别名、描述和修复
 
 ```bash
 bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix --scan-depth 2
+```
+
+中文非交互安装示例：
+
+```bash
+bash scripts/install.sh --yes --language zh --repo /absolute/path/to/docs-repo
 ```
 
 扫描结果会写入 catalog。之后用户用自然语言提问，Agent 会根据项目名、路径、别名和描述选择仓库，再进入仓库查文档和代码。

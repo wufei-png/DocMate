@@ -25,6 +25,7 @@ fi
 YES=0
 HOSTS_RAW=""
 HOSTS_ARG_SET=0
+SKILL_LANG=""
 INSTALL_MODE=""
 EXISTING="backup"
 UPDATE_MODE="ask"
@@ -43,8 +44,8 @@ fi
 usage() {
   cat >&2 <<'EOF'
 Usage:
-  install.sh [--yes] --repo PATH [--repo PATH ...] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode auto|ask|off] [--scan-depth N]
-  install.sh [--yes] --auto-scan --scan-root PATH [--scan-depth N] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode auto|ask|off]
+  install.sh [--yes] --repo PATH [--repo PATH ...] [--language en|zh] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode auto|ask|off] [--scan-depth N]
+  install.sh [--yes] --auto-scan --scan-root PATH [--scan-depth N] [--language en|zh] [--install-mode global|single|custom] [--hosts all|openclaw,claude-code,opencode,codex,hermes] [--existing backup|skip|overwrite] [--update-mode auto|ask|off]
   install.sh
 
 Pipe install:
@@ -59,6 +60,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --yes) YES=1; shift ;;
     --repo|--project) REPO_ARGS+=("${2:-}"); shift 2 ;;
+    --language) SKILL_LANG="${2:-}"; shift 2 ;;
     --auto-scan) AUTO_SCAN=1; shift ;;
     --scan-root) SCAN_ROOT="${2:-}"; shift 2 ;;
     --scan-depth) SCAN_MAX_DEPTH="${2:-}"; SCAN_DEPTH_CONFIGURED=1; shift 2 ;;
@@ -72,6 +74,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 case "$EXISTING" in backup|skip|overwrite) ;; *) usage ;; esac
+case "$SKILL_LANG" in ""|en|zh) ;; *) usage ;; esac
 case "$INSTALL_MODE" in ""|global|single|custom) ;; *) usage ;; esac
 case "$UPDATE_MODE" in ask|auto|off) ;; *) usage ;; esac
 case "$SCAN_MAX_DEPTH" in ""|*[!0-9]*|0) usage ;; esac
@@ -711,6 +714,54 @@ select_install_targets() {
   print_host_summary
 }
 
+select_skill_language() {
+  local choice=""
+
+  if [ -n "$SKILL_LANG" ]; then
+    case "$SKILL_LANG" in
+      zh) echo "Selected skill language: 中文" ;;
+      en) echo "Selected skill language: English" ;;
+    esac
+    return
+  fi
+
+  if [ "$YES" -eq 1 ] || ! can_prompt; then
+    SKILL_LANG="en"
+    echo "Selected skill language: English"
+    return
+  fi
+
+  if can_use_interactive_menu; then
+    MENU_LABELS=("English" "中文")
+    MENU_VALUES=(en zh)
+    MENU_ENABLED=(1 1)
+    MENU_ROW_DETECTED=(0 0)
+    MENU_ALL_DETECTED_MODE=0
+    run_menu "Skill language / 选择语言" "single" "Please select one skill language."
+    SKILL_LANG="$MENU_RESULT"
+  else
+    echo "Skill language / 选择语言:"
+    echo "  [1] English"
+    echo "  [2] 中文"
+    echo ""
+
+    while true; do
+      read_user_line "Enter choice [1-2, default 1]: "
+      choice="$REPLY"
+      case "$choice" in
+        ""|1) SKILL_LANG="en"; break ;;
+        2) SKILL_LANG="zh"; break ;;
+        *) echo "Invalid choice. Please try again." ;;
+      esac
+    done
+  fi
+
+  case "$SKILL_LANG" in
+    zh) echo "Selected skill language: 中文" ;;
+    en) echo "Selected skill language: English" ;;
+  esac
+}
+
 should_use_local_file() {
   local rel_path="$1"
 
@@ -758,6 +809,23 @@ materialize_file() {
   fi
 
   download_remote_file "$rel_path" "$dest_path"
+}
+
+deploy_skill_file() {
+  local rel_path="skills/docmate/SKILL.en.md"
+
+  if [ "$SKILL_LANG" = "zh" ]; then
+    rel_path="skills/docmate/SKILL.zh.md"
+  fi
+
+  materialize_file "$rel_path" "$INSTALL_TARGET_DIR/SKILL.md"
+  rm -f "$INSTALL_TARGET_DIR/SKILL.en.md" "$INSTALL_TARGET_DIR/SKILL.zh.md" 2>/dev/null || true
+
+  if [ "$SKILL_LANG" = "zh" ]; then
+    echo "Deployed Chinese DocMate skill."
+  else
+    echo "Deployed English DocMate skill."
+  fi
 }
 
 find_node() {
@@ -1511,6 +1579,8 @@ discover_repos_interactive() {
   done
 }
 
+select_skill_language
+
 for repo_arg in ${REPO_ARGS[@]+"${REPO_ARGS[@]}"}; do
   process_repo_path "$repo_arg"
 done
@@ -1537,7 +1607,7 @@ if ! prepare_install_dir "$INSTALL_TARGET_DIR" "$INSTALL_MODE install target"; t
   exit 0
 fi
 
-materialize_file "skills/docmate/SKILL.md" "$INSTALL_TARGET_DIR/SKILL.md"
+deploy_skill_file
 mkdir -p "$INSTALL_TARGET_DIR/references"
 
 NODE_BIN="$(find_node)"

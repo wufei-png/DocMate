@@ -12,10 +12,21 @@ curl -fsSL https://raw.githubusercontent.com/wufei-png/DocMate/main/scripts/inst
 Interactive installs use keyboard menus when a TTY is available: Up/Down moves,
 Space selects, and Enter selects or confirms depending on the menu.
 
+DocMate can install either the English or Chinese skill template. Interactive
+installs ask for the language. Non-interactive installs default to English for
+backward compatibility; pass `--language zh` to install the Chinese skill or
+`--language en` to be explicit.
+
 Install from a local clone with explicit repositories:
 
 ```bash
 bash scripts/install.sh --yes --repo /absolute/path/to/docs-repo
+```
+
+Install the Chinese skill template non-interactively:
+
+```bash
+bash scripts/install.sh --yes --language zh --repo /absolute/path/to/docs-repo
 ```
 
 Install from a local clone by scanning a repository prefix directory:
