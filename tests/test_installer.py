@@ -186,7 +186,13 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     assert catalog["defaults"]["update"]["mode"] == "ask"
     assert "Optional catalog enrichment" in result.stdout
     assert "repos[].description" in result.stdout
-    assert "repos[].aliases" in result.stdout
+    assert "paste it into your own agent" in result.stdout
+    assert (
+        "https://github.com/wufei-png/DocMate/blob/main/docs/prompts/fill-catalog-descriptions.md"
+        in result.stdout
+    )
+    assert f"{canonical}/references/docmate.catalog.json" in result.stdout
+    assert "repos[].aliases: fill manually" in result.stdout
     assert "repos[].baseBranchCandidates" in result.stdout
 
 

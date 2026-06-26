@@ -5,6 +5,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SKILL = ROOT / "skills" / "docmate" / "SKILL.md"
 SKILL_EN = ROOT / "skills" / "docmate" / "SKILL.en.md"
 SKILL_ZH = ROOT / "skills" / "docmate" / "SKILL.zh.md"
+DESCRIPTION_PROMPT = ROOT / "docs" / "prompts" / "fill-catalog-descriptions.md"
 
 
 def test_skill_frontmatter_and_trigger_description_cover_docmate_workflow():
@@ -88,3 +89,21 @@ def test_skill_has_no_internal_project_terms():
     ]
     for term in forbidden:
         assert term not in content
+
+
+def test_description_fill_prompt_has_safe_write_constraints():
+    content = DESCRIPTION_PROMPT.read_text()
+
+    assert "Copy this prompt into your own agent" in content
+    assert "docmate.catalog.json.backup-YYYYMMDD-HHMMSS" in content
+    assert "Only modify repos[].description" in content
+    assert "Do not modify any other field" in content
+    assert "Keep the existing repo order" in content
+    assert "2-space indentation" in content
+    assert "Skip any repo that already has a non-empty description" in content
+    assert "Do not guess" in content
+    assert "Do not deeply traverse source code, run tests, or use network sources" in content
+    assert "80 Chinese characters" in content
+    assert "140 characters" in content
+    assert "valid JSON" in content
+    assert "delete the backup file" in content

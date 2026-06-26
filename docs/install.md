@@ -73,9 +73,12 @@ After installation, edit:
 ```
 
 For `single` installs, use the `Catalog:` path printed by the installer instead.
-`repos[].description` and `repos[].aliases` are optional fields. Add them when
-project background, product scope, or short names would help agents route
-ambiguous requests.
+`repos[].description` and `repos[].aliases` are optional fields. To auto-fill
+missing descriptions, open the one-time prompt at
+`https://github.com/wufei-png/DocMate/blob/main/docs/prompts/fill-catalog-descriptions.md`,
+paste it into your own agent, and provide the actual catalog path printed by
+the installer. Fill `repos[].aliases` manually with short names users may type
+for the project.
 `repos[].baseBranchCandidates` is seeded from the detected remote default branch
 with `gh`, `glab`, or `git`, then local HEAD, then fallback `main`; edit it when
 documentation repair should target a different branch.

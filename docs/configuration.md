@@ -9,9 +9,12 @@ Important fields:
 - `repos[].path`: repository path to use as the task working context. DocMate
   discovers documentation inside this repository and discovers related code
   repositories at execution time when verification requires it.
-- `repos[].description`: optional project background. Add it when product
-  scope, ownership, or domain context would help the agent route vague requests.
+- `repos[].description`: optional project background. To auto-fill missing
+  descriptions, open the one-time prompt at
+  `https://github.com/wufei-png/DocMate/blob/main/docs/prompts/fill-catalog-descriptions.md`,
+  paste it into your own agent, and provide the actual catalog path.
 - `repos[].aliases`: optional short names users may type for this repository.
+  Fill aliases manually when they would help agents route ambiguous requests.
 - `baseBranchCandidates`: ordered base branches for documentation repair.
   DocMate tries these when creating a temporary repair worktree. The installer
   seeds this from each repository's detected remote default branch with `gh`,
