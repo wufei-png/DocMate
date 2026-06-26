@@ -81,6 +81,54 @@ def run_install(home: Path, repo: Path, extra_args: Optional[List[str]] = None, 
     return run_install_args(home, args)
 
 
+def run_pty_command(command: str, input_text: str, env: dict, timeout: int = 15):
+    if shutil.which("script"):
+        script_probe = subprocess.run(
+            ["script", "-qfec", "true", "/dev/null"],
+            text=True,
+            capture_output=True,
+            check=False,
+            timeout=5,
+        )
+        if script_probe.returncode == 0:
+            return subprocess.run(
+                ["script", "-qfec", command, "/dev/null"],
+                text=True,
+                input=input_text,
+                capture_output=True,
+                env=env,
+                check=False,
+                timeout=timeout,
+            )
+
+    if shutil.which("expect"):
+        expect_env = env.copy()
+        expect_env["DOCMATE_TEST_PTY_COMMAND"] = command
+        expect_env["DOCMATE_TEST_PTY_INPUT"] = input_text
+        expect_env["DOCMATE_TEST_PTY_TIMEOUT"] = str(timeout)
+        return subprocess.run(
+            [
+                "expect",
+                "-c",
+                """
+set timeout $env(DOCMATE_TEST_PTY_TIMEOUT)
+spawn -noecho /bin/bash -lc $env(DOCMATE_TEST_PTY_COMMAND)
+send -- $env(DOCMATE_TEST_PTY_INPUT)
+expect eof
+set wait_result [wait]
+exit [lindex $wait_result 3]
+""",
+            ],
+            text=True,
+            capture_output=True,
+            env=expect_env,
+            check=False,
+            timeout=timeout + 5,
+        )
+
+    pytest.skip("script -qfec or expect is required for pseudo-tty installer test")
+
+
 def test_piped_installer_without_repo_exits_when_interactive_input_is_unavailable(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
@@ -210,9 +258,6 @@ def test_single_host_install_writes_directly_to_selected_host(tmp_path):
 
 
 def test_interactive_agent_platform_mode_menu_lists_supported_platforms(tmp_path):
-    if not shutil.which("script"):
-        pytest.skip("script command is required for pseudo-tty installer test")
-
     home = tmp_path / "home"
     home.mkdir()
     repo = tmp_path / "docs-project"
@@ -235,15 +280,7 @@ def test_interactive_agent_platform_mode_menu_lists_supported_platforms(tmp_path
         f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
         f"--repo {shlex.quote(str(repo))} --update-mode ask --existing overwrite"
     )
-    result = subprocess.run(
-        ["script", "-qfec", command, "/dev/null"],
-        text=True,
-        input="\r",
-        capture_output=True,
-        env=env,
-        check=False,
-        timeout=15,
-    )
+    result = run_pty_command(command, "\r", env)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Agent platform mode" in result.stdout
@@ -252,9 +289,6 @@ def test_interactive_agent_platform_mode_menu_lists_supported_platforms(tmp_path
 
 
 def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
-    if not shutil.which("script"):
-        pytest.skip("script command is required for pseudo-tty installer test")
-
     home = tmp_path / "home"
     home.mkdir()
     repo = tmp_path / "docs-project"
@@ -277,15 +311,7 @@ def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
         f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
         f"--repo {shlex.quote(str(repo))} --update-mode auto --install-mode single --existing overwrite"
     )
-    result = subprocess.run(
-        ["script", "-qfec", command, "/dev/null"],
-        text=True,
-        input="\x1b[B\x1b[B\r",
-        capture_output=True,
-        env=env,
-        check=False,
-        timeout=15,
-    )
+    result = run_pty_command(command, "\x1b[B\x1b[B\r", env)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Use Up/Down to move, Space or Enter to select." in result.stdout
@@ -295,9 +321,6 @@ def test_interactive_single_host_menu_supports_arrow_enter_selection(tmp_path):
 
 
 def test_interactive_update_mode_menu_writes_global_default(tmp_path):
-    if not shutil.which("script"):
-        pytest.skip("script command is required for pseudo-tty installer test")
-
     home = tmp_path / "home"
     home.mkdir()
     repo = tmp_path / "docs-project"
@@ -320,15 +343,7 @@ def test_interactive_update_mode_menu_writes_global_default(tmp_path):
         f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
         f"--repo {shlex.quote(str(repo))} --hosts codex --existing overwrite"
     )
-    result = subprocess.run(
-        ["script", "-qfec", command, "/dev/null"],
-        text=True,
-        input="\r",
-        capture_output=True,
-        env=env,
-        check=False,
-        timeout=15,
-    )
+    result = run_pty_command(command, "\r", env)
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "Documentation repair mode" in result.stdout

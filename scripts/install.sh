@@ -94,7 +94,7 @@ MENU_ALL_DETECTED_MODE=0
 
 cleanup() {
   local tmp_file
-  for tmp_file in "${TMP_FILES[@]}"; do
+  for tmp_file in ${TMP_FILES[@]+"${TMP_FILES[@]}"}; do
     [ -n "$tmp_file" ] && rm -f "$tmp_file"
   done
 }
@@ -408,7 +408,7 @@ add_selected_host() {
     echo "Error: unsupported agent platform: $host" >&2
     exit 1
   fi
-  if ! array_contains "$host" "${HOSTS[@]}"; then
+  if ! array_contains "$host" ${HOSTS[@]+"${HOSTS[@]}"}; then
     HOSTS+=("$host")
   fi
 }
@@ -461,7 +461,7 @@ print_host_summary() {
   echo "Agent platform status:"
   for host in "${SUPPORTED_HOSTS[@]}"; do
     marker="[ ]"
-    if array_contains "$host" "${HOSTS[@]}"; then
+    if array_contains "$host" ${HOSTS[@]+"${HOSTS[@]}"}; then
       marker="[x]"
     fi
     echo "  $marker $(host_label "$host") ($(host_status_label "$host"))"
@@ -575,7 +575,7 @@ select_custom_hosts_interactive() {
     build_host_menu_rows "true"
     MENU_ALL_DETECTED_MODE=1
     run_menu "Select agent platforms" "multi" "Please select at least one agent platform."
-    HOSTS=("${MENU_RESULTS[@]}")
+    HOSTS=(${MENU_RESULTS[@]+"${MENU_RESULTS[@]}"})
     MENU_ALL_DETECTED_MODE=0
     return
   fi
@@ -947,7 +947,7 @@ repo_path_exists() {
   local repo_path="$1"
   local existing_path
 
-  for existing_path in "${REPOS[@]}"; do
+  for existing_path in ${REPOS[@]+"${REPOS[@]}"}; do
     if [ "$existing_path" = "$repo_path" ]; then
       return 0
     fi
@@ -980,7 +980,7 @@ remove_repo_index() {
     fi
   done
 
-  REPOS=("${filtered[@]}")
+  REPOS=(${filtered[@]+"${filtered[@]}"})
 }
 
 resolve_duplicate_repo_names() {
@@ -1511,7 +1511,7 @@ discover_repos_interactive() {
   done
 }
 
-for repo_arg in "${REPO_ARGS[@]}"; do
+for repo_arg in ${REPO_ARGS[@]+"${REPO_ARGS[@]}"}; do
   process_repo_path "$repo_arg"
 done
 
@@ -1543,7 +1543,7 @@ mkdir -p "$INSTALL_TARGET_DIR/references"
 NODE_BIN="$(find_node)"
 REPO_FILE="$(mktemp)"
 TMP_FILES+=("$REPO_FILE")
-for repo_path in "${REPOS[@]}"; do
+for repo_path in ${REPOS[@]+"${REPOS[@]}"}; do
   printf '%s\t%s\n' "$repo_path" "$(detect_default_branch "$repo_path")" >> "$REPO_FILE"
 done
 
@@ -1581,7 +1581,7 @@ EOF
 run_catalog_validator "$INSTALL_TARGET_DIR/references/docmate.catalog.json"
 
 if [ "$INSTALL_STRATEGY" = "symlink" ]; then
-  for host in "${HOSTS[@]}"; do
+  for host in ${HOSTS[@]+"${HOSTS[@]}"}; do
     target="$(host_dir "$host")"
     if [ "$target" = "$CANONICAL_DIR" ]; then
       continue
