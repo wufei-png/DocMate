@@ -66,6 +66,10 @@ for OpenClaw, Claude Code, OpenCode, and Hermes. Codex uses the canonical
 `~/.agents/skills/docmate` directory directly, so the `codex` platform does not
 create a separate `~/.codex` link.
 
+When `--existing backup` replaces a real directory or file, the old target is
+moved under `${TMPDIR:-/tmp}/docmate-skill-backups/install-*`. Existing symlink
+install targets are unlinked and recreated, not backed up.
+
 After installation, edit:
 
 ```text

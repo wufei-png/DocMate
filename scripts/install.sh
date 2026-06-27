@@ -36,6 +36,8 @@ SCAN_ROOT=""
 REPO_ARGS=()
 REPOS=()
 TMP_FILES=()
+BACKUP_ROOT=""
+BACKUP_OCCURRED=0
 TTY_FD=9
 TTY_AVAILABLE=0
 if { exec 9<>/dev/tty; } 2>/dev/null; then
@@ -872,24 +874,46 @@ host_dir() {
   esac
 }
 
+path_exists() {
+  [ -e "$1" ] || [ -L "$1" ]
+}
+
+ensure_backup_root() {
+  local temp_base="${TMPDIR:-/tmp}"
+  local backup_base=""
+
+  if [ -n "$BACKUP_ROOT" ]; then
+    return
+  fi
+
+  temp_base="${temp_base%/}"
+  backup_base="$temp_base/docmate-skill-backups"
+  mkdir -p "$backup_base"
+  BACKUP_ROOT="$(mktemp -d "$backup_base/install-$(date +%Y%m%d-%H%M%S)-XXXXXXXX")"
+}
+
 backup_path() {
   local target="$1"
+  local source_label="$2"
+  local name="${source_label}-$(basename "$target")"
+  local candidate=""
   local index=0
-  while [ -e "${target}_backup_${index}" ] || [ -L "${target}_backup_${index}" ]; do
+
+  ensure_backup_root
+  candidate="$BACKUP_ROOT/$name"
+  while path_exists "$candidate"; do
     index=$((index + 1))
+    candidate="$BACKUP_ROOT/${name}_${index}"
   done
-  printf '%s\n' "${target}_backup_${index}"
+  printf '%s\n' "$candidate"
 }
 
 prepare_target() {
   local target="$1"
-  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
-    mkdir -p "$(dirname "$target")"
-    return
-  fi
+  local source_label="$2"
+  local link_target=""
 
-  if [ -L "$target" ] && [ "$(readlink "$target")" = "$CANONICAL_DIR" ]; then
-    rm -f "$target"
+  if ! path_exists "$target"; then
     mkdir -p "$(dirname "$target")"
     return
   fi
@@ -900,13 +924,27 @@ prepare_target() {
       return 1
       ;;
     overwrite)
-      rm -rf "$target"
+      if [ -L "$target" ]; then
+        link_target="$(readlink "$target" 2>/dev/null || true)"
+        rm -f "$target"
+        echo "Removed existing symlink: $target -> $link_target"
+      else
+        rm -rf "$target"
+      fi
       ;;
     backup)
-      local backup
-      backup="$(backup_path "$target")"
-      mv "$target" "$backup"
-      echo "Backed up $target to $backup"
+      if [ -L "$target" ]; then
+        link_target="$(readlink "$target" 2>/dev/null || true)"
+        rm -f "$target"
+        echo "Removed existing symlink: $target -> $link_target"
+      else
+        local backup
+        ensure_backup_root
+        backup="$(backup_path "$target" "$source_label")"
+        mv "$target" "$backup"
+        BACKUP_OCCURRED=1
+        echo "Backed up $target to $backup"
+      fi
       ;;
   esac
   mkdir -p "$(dirname "$target")"
@@ -915,8 +953,10 @@ prepare_target() {
 prepare_install_dir() {
   local target="$1"
   local label="${2:-install target}"
+  local source_label="${3:-canonical}"
+  local link_target=""
 
-  if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+  if ! path_exists "$target"; then
     mkdir -p "$target"
     return
   fi
@@ -927,16 +967,84 @@ prepare_install_dir() {
       return 1
       ;;
     overwrite)
-      rm -rf "$target"
+      if [ -L "$target" ]; then
+        link_target="$(readlink "$target" 2>/dev/null || true)"
+        rm -f "$target"
+        echo "Removed existing symlink: $target -> $link_target"
+      else
+        rm -rf "$target"
+      fi
       ;;
     backup)
-      local backup
-      backup="$(backup_path "$target")"
-      mv "$target" "$backup"
-      echo "Backed up $target to $backup"
+      if [ -L "$target" ]; then
+        link_target="$(readlink "$target" 2>/dev/null || true)"
+        rm -f "$target"
+        echo "Removed existing symlink: $target -> $link_target"
+      else
+        local backup
+        ensure_backup_root
+        backup="$(backup_path "$target" "$source_label")"
+        mv "$target" "$backup"
+        BACKUP_OCCURRED=1
+        echo "Backed up $target to $backup"
+      fi
       ;;
   esac
   mkdir -p "$target"
+}
+
+plan_existing_target() {
+  local target="$1"
+  local label="${2:-target}"
+
+  if ! path_exists "$target"; then
+    return 0
+  fi
+
+  case "$EXISTING" in
+    skip)
+      echo "Skipping existing $label: $target"
+      return 1
+      ;;
+  esac
+
+  return 0
+}
+
+preflight_existing_targets() {
+  local host=""
+  local target=""
+
+  if ! plan_existing_target "$INSTALL_TARGET_DIR" "$INSTALL_MODE install target"; then
+    return 1
+  fi
+
+  if [ "$INSTALL_STRATEGY" != "symlink" ]; then
+    return 0
+  fi
+
+  for host in ${HOSTS[@]+"${HOSTS[@]}"}; do
+    target="$(host_dir "$host")"
+    if [ "$target" = "$CANONICAL_DIR" ]; then
+      continue
+    fi
+    if ! plan_existing_target "$target" "host target"; then
+      return 1
+    fi
+  done
+
+  return 0
+}
+
+print_backup_summary() {
+  if [ "$BACKUP_OCCURRED" -eq 0 ]; then
+    return
+  fi
+
+  echo
+  echo "Backups moved to:"
+  echo "  $BACKUP_ROOT"
+  echo "Temporary backups are stored under the system temp directory and may be removed by the operating system later."
 }
 
 read_user_line() {
@@ -1603,7 +1711,17 @@ select_update_mode_interactive
 echo "Selected documentation repair mode: $UPDATE_MODE"
 select_install_targets
 
-if ! prepare_install_dir "$INSTALL_TARGET_DIR" "$INSTALL_MODE install target"; then
+install_target_source_label="canonical"
+if [ "$INSTALL_TARGET_DIR" != "$CANONICAL_DIR" ] && [ "$INSTALL_STRATEGY" = "direct" ] && [ "${#HOSTS[@]}" -eq 1 ]; then
+  install_target_source_label="${HOSTS[0]}"
+fi
+
+if ! preflight_existing_targets; then
+  echo "DocMate install skipped. Use --existing backup or --existing overwrite to replace the existing target."
+  exit 0
+fi
+
+if ! prepare_install_dir "$INSTALL_TARGET_DIR" "$INSTALL_MODE install target" "$install_target_source_label"; then
   echo "DocMate install skipped. Use --existing backup or --existing overwrite to replace the install target."
   exit 0
 fi
@@ -1657,11 +1775,13 @@ if [ "$INSTALL_STRATEGY" = "symlink" ]; then
     if [ "$target" = "$CANONICAL_DIR" ]; then
       continue
     fi
-    if prepare_target "$target"; then
+    if prepare_target "$target" "$host"; then
       ln -s "$CANONICAL_DIR" "$target"
     fi
   done
 fi
+
+print_backup_summary
 
 echo "DocMate installed to $INSTALL_TARGET_DIR"
 echo "Catalog: $INSTALL_TARGET_DIR/references/docmate.catalog.json"

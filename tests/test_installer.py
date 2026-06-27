@@ -48,6 +48,7 @@ def run_install_args(
     node_wrapper.write_text(f"#!/usr/bin/env bash\nexec {node_executable} \"$@\"\n")
     node_wrapper.chmod(0o755)
     env["HOME"] = str(home)
+    env["TMPDIR"] = str(home / "tmp")
     path_entries = [str(bin_dir), "/usr/bin", "/bin"]
     if extra_path:
         path_entries.insert(0, str(extra_path))
@@ -62,6 +63,13 @@ def run_install_args(
         check=False,
         timeout=timeout,
     )
+
+
+def backup_roots(home: Path) -> List[Path]:
+    backup_base = home / "tmp" / "docmate-skill-backups"
+    if not backup_base.exists():
+        return []
+    return sorted(backup_base.glob("install-*"))
 
 
 def run_install(home: Path, repo: Path, extra_args: Optional[List[str]] = None, path_flag: str = "--repo"):
@@ -445,10 +453,14 @@ def test_existing_host_directory_is_backed_up_before_linking(tmp_path):
     result = run_install(home, repo)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    backup = home / ".openclaw" / "skills" / "docmate_backup_0"
+    roots = backup_roots(home)
+    assert len(roots) == 1
+    backup = roots[0] / "openclaw-docmate"
     assert backup.exists()
     assert (backup / "old.txt").read_text() == "old"
     assert existing.is_symlink()
+    assert str(roots[0]) in result.stdout
+    assert not (home / ".openclaw" / "skills" / "docmate_backup_0").exists()
 
 
 def test_existing_canonical_directory_is_backed_up_before_reinstall(tmp_path):
@@ -465,12 +477,180 @@ def test_existing_canonical_directory_is_backed_up_before_reinstall(tmp_path):
     result = run_install(home, repo)
 
     assert result.returncode == 0, result.stdout + result.stderr
-    backup = home / ".agents" / "skills" / "docmate_backup_0"
+    roots = backup_roots(home)
+    assert len(roots) == 1
+    backup = roots[0] / "canonical-docmate"
     assert backup.exists()
     assert (backup / "references" / "docmate.catalog.json").read_text() == '{"custom": true}\n'
     assert (canonical / "SKILL.md").exists()
     assert (canonical / "references" / "docmate.catalog.json").exists()
     assert not (canonical / "references" / "docmate.catalog.example.json").exists()
+    assert str(roots[0]) in result.stdout
+    assert not (home / ".agents" / "skills" / "docmate_backup_0").exists()
+
+
+def test_existing_canonical_and_host_directories_share_one_backup_root(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    canonical = home / ".agents" / "skills" / "docmate"
+    canonical.mkdir(parents=True)
+    (canonical / "old-canonical.txt").write_text("old-canonical")
+    openclaw = home / ".openclaw" / "skills" / "docmate"
+    openclaw.mkdir(parents=True)
+    (openclaw / "old-openclaw.txt").write_text("old-openclaw")
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install(home, repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    roots = backup_roots(home)
+    assert len(roots) == 1
+    assert (roots[0] / "canonical-docmate" / "old-canonical.txt").read_text() == "old-canonical"
+    assert (roots[0] / "openclaw-docmate" / "old-openclaw.txt").read_text() == "old-openclaw"
+    assert str(roots[0]) in result.stdout
+    assert openclaw.is_symlink()
+
+
+def test_existing_host_symlink_is_replaced_without_backup(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    external = tmp_path / "external-docmate"
+    external.mkdir()
+    (external / "old.txt").write_text("old")
+    existing = home / ".openclaw" / "skills" / "docmate"
+    existing.parent.mkdir(parents=True)
+    existing.symlink_to(external)
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install(home, repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    canonical = home / ".agents" / "skills" / "docmate"
+    assert existing.is_symlink()
+    assert existing.resolve() == canonical
+    assert (external / "old.txt").read_text() == "old"
+    assert backup_roots(home) == []
+
+
+def test_existing_skip_preserves_symlink_target(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    external = tmp_path / "external-docmate"
+    external.mkdir()
+    (external / "old.txt").write_text("old")
+    canonical = home / ".agents" / "skills" / "docmate"
+    canonical.parent.mkdir(parents=True)
+    canonical.symlink_to(external)
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--repo",
+            str(repo),
+            "--hosts",
+            "all",
+            "--existing",
+            "skip",
+        ],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert canonical.is_symlink()
+    assert canonical.resolve() == external
+    assert (external / "old.txt").read_text() == "old"
+    assert backup_roots(home) == []
+
+
+def test_existing_skip_preserves_host_symlink_to_canonical_without_partial_install(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    canonical = home / ".agents" / "skills" / "docmate"
+    host_target = home / ".openclaw" / "skills" / "docmate"
+    host_target.parent.mkdir(parents=True)
+    host_target.symlink_to(canonical)
+    before_inode = host_target.lstat().st_ino
+    before_link = host_target.readlink()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--repo",
+            str(repo),
+            "--install-mode",
+            "global",
+            "--hosts",
+            "openclaw",
+            "--existing",
+            "skip",
+        ],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Skipping existing host target" in result.stdout
+    assert "Removed existing symlink" not in result.stdout
+    assert "Backups moved to:" not in result.stdout
+    assert "DocMate installed to" not in result.stdout
+    assert host_target.is_symlink()
+    assert host_target.lstat().st_ino == before_inode
+    assert host_target.readlink() == before_link
+    assert not canonical.exists()
+    assert backup_roots(home) == []
+
+
+def test_existing_skip_preserves_host_directory_without_partial_install(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    canonical = home / ".agents" / "skills" / "docmate"
+    host_target = home / ".openclaw" / "skills" / "docmate"
+    host_target.mkdir(parents=True)
+    (host_target / "old.txt").write_text("old")
+    before_inode = host_target.lstat().st_ino
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--repo",
+            str(repo),
+            "--install-mode",
+            "global",
+            "--hosts",
+            "openclaw",
+            "--existing",
+            "skip",
+        ],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Skipping existing host target" in result.stdout
+    assert "Backups moved to:" not in result.stdout
+    assert "DocMate installed to" not in result.stdout
+    assert host_target.is_dir()
+    assert host_target.lstat().st_ino == before_inode
+    assert (host_target / "old.txt").read_text() == "old"
+    assert not canonical.exists()
+    assert backup_roots(home) == []
 
 
 def test_installer_generates_valid_starter_catalog(tmp_path):
