@@ -129,11 +129,15 @@ bash scripts/install.sh --yes --language zh --repo /absolute/path/to/docs-repo
 Non-interactive install with repository auto scan:
 
 ```bash
-bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix --scan-depth 2
+bash scripts/install.sh --yes --auto-scan \
+  --scan-root /absolute/path/to/repo-prefix-a \
+  --scan-root /absolute/path/to/repo-prefix-b \
+  --scan-depth 2
 ```
 
-Auto scan defaults to depth `2`. In interactive installs, the installer asks for
-the scan depth after the prefix directory; for scripts, use `--scan-depth N` or
+Auto scan defaults to depth `2`. In interactive installs, the installer accepts
+repository prefix directories one per line, then asks for the scan depth; for
+scripts, repeat `--scan-root PATH` for each prefix and use `--scan-depth N` or
 `DOCMATE_SCAN_MAX_DEPTH=N`.
 
 Agent platform modes:

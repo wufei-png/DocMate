@@ -808,6 +808,43 @@ def test_installer_auto_scan_adds_detected_repositories(tmp_path):
     assert {repo["path"] for repo in catalog["repos"]} == {str(repo_a), str(repo_b)}
 
 
+def test_installer_auto_scan_accepts_multiple_scan_roots(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    scan_root_a = tmp_path / "scan-root-a"
+    scan_root_b = tmp_path / "scan-root-b"
+    repo_a = scan_root_a / "docs-a"
+    repo_b = scan_root_b / "docs-b"
+    repo_a.mkdir(parents=True)
+    repo_b.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_a, check=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_b, check=True)
+
+    result = run_install_args(
+        home,
+        [
+            "bash",
+            str(ROOT / "scripts" / "install.sh"),
+            "--yes",
+            "--auto-scan",
+            "--scan-root",
+            str(scan_root_a),
+            "--scan-root",
+            str(scan_root_b),
+            "--hosts",
+            "codex",
+            "--existing",
+            "backup",
+        ],
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    catalog = json.loads(
+        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
+    )
+    assert {repo["path"] for repo in catalog["repos"]} == {str(repo_a), str(repo_b)}
+
+
 def test_installer_auto_scan_default_depth_is_two(tmp_path):
     home = tmp_path / "home"
     home.mkdir()

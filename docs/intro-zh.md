@@ -28,7 +28,10 @@ DocMate 的核心是一份 skill。里面写清楚 Agent 怎么选仓库、先�
 DocMate 用 `docmate.catalog.json` 记录项目路径、别名、描述和修复基线。安装时可以手动添加仓库，也可以扫描一个仓库前缀目录：
 
 ```bash
-bash scripts/install.sh --yes --auto-scan --scan-root /absolute/path/to/repo-prefix --scan-depth 2
+bash scripts/install.sh --yes --auto-scan \
+  --scan-root /absolute/path/to/repo-prefix-a \
+  --scan-root /absolute/path/to/repo-prefix-b \
+  --scan-depth 2
 ```
 
 中文非交互安装示例：
