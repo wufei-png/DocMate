@@ -1256,10 +1256,10 @@ resolve_duplicate_repo_names() {
         "Exit install"
         "Rename A: ${REPOS[$first]}"
         "Rename B: ${REPOS[$second]}"
-        "Exclude A: ${REPOS[$first]}"
-        "Exclude B: ${REPOS[$second]}"
+        "Use A (exclude B): ${REPOS[$first]}"
+        "Use B (exclude A): ${REPOS[$second]}"
       )
-      MENU_VALUES=(exit rename-first rename-second exclude-first exclude-second)
+      MENU_VALUES=(exit rename-first rename-second use-first use-second)
       MENU_ENABLED=(1 1 1 1 1)
       MENU_ROW_DETECTED=(0 0 0 0 0)
       MENU_ALL_DETECTED_MODE=0
@@ -1277,14 +1277,14 @@ resolve_duplicate_repo_names() {
           rename_repo_index "$second" "B"
           continue
           ;;
-        exclude-first)
-          echo "Excluding ${REPOS[$first]}"
-          remove_repo_index "$first"
+        use-first)
+          echo "Using ${REPOS[$first]} and excluding ${REPOS[$second]}"
+          remove_repo_index "$second"
           continue
           ;;
-        exclude-second)
-          echo "Excluding ${REPOS[$second]}"
-          remove_repo_index "$second"
+        use-second)
+          echo "Using ${REPOS[$second]} and excluding ${REPOS[$first]}"
+          remove_repo_index "$first"
           continue
           ;;
       esac
@@ -1295,8 +1295,8 @@ resolve_duplicate_repo_names() {
       echo "  [1] Exit install"
       echo "  [2] Rename A: ${REPOS[$first]}"
       echo "  [3] Rename B: ${REPOS[$second]}"
-      echo "  [4] Exclude A: ${REPOS[$first]}"
-      echo "  [5] Exclude B: ${REPOS[$second]}"
+      echo "  [4] Use A (exclude B): ${REPOS[$first]}"
+      echo "  [5] Use B (exclude A): ${REPOS[$second]}"
       read_user_line "Enter choice [1-5]: "
       choice="$REPLY"
       case "$choice" in
@@ -1313,13 +1313,13 @@ resolve_duplicate_repo_names() {
           break
           ;;
         4)
-          echo "Excluding ${REPOS[$first]}"
-          remove_repo_index "$first"
+          echo "Using ${REPOS[$first]} and excluding ${REPOS[$second]}"
+          remove_repo_index "$second"
           break
           ;;
         5)
-          echo "Excluding ${REPOS[$second]}"
-          remove_repo_index "$second"
+          echo "Using ${REPOS[$second]} and excluding ${REPOS[$first]}"
+          remove_repo_index "$first"
           break
           ;;
         *) echo "Invalid choice. Please try again." ;;
