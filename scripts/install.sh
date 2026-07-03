@@ -35,6 +35,7 @@ AUTO_SCAN=0
 SCAN_ROOTS=()
 REPO_ARGS=()
 REPOS=()
+REPO_NAMES=()
 TMP_FILES=()
 BACKUP_ROOT=""
 BACKUP_OCCURRED=0
@@ -1143,6 +1144,7 @@ add_repo_path() {
   fi
 
   REPOS+=("$repo_path")
+  REPO_NAMES+=("$(basename "$repo_path")")
   echo "Added repository: $(basename "$repo_path") ($repo_path)"
 }
 
@@ -1150,14 +1152,66 @@ remove_repo_index() {
   local remove_index="$1"
   local index=0
   local filtered=()
+  local filtered_names=()
 
   for index in "${!REPOS[@]}"; do
     if [ "$index" -ne "$remove_index" ]; then
       filtered+=("${REPOS[$index]}")
+      filtered_names+=("${REPO_NAMES[$index]}")
     fi
   done
 
   REPOS=(${filtered[@]+"${filtered[@]}"})
+  REPO_NAMES=(${filtered_names[@]+"${filtered_names[@]}"})
+}
+
+repo_name_exists_except() {
+  local repo_name="$1"
+  local skip_index="$2"
+  local index=0
+
+  for index in "${!REPO_NAMES[@]}"; do
+    if [ "$index" -eq "$skip_index" ]; then
+      continue
+    fi
+    if [ "${REPO_NAMES[$index]}" = "$repo_name" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+rename_repo_index() {
+  local rename_index="$1"
+  local label="$2"
+  local new_name=""
+  local trimmed_name=""
+
+  while true; do
+    read_user_line "New catalog name for $label (${REPOS[$rename_index]}): "
+    new_name="$REPLY"
+    trimmed_name="$(printf '%s' "$new_name" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    if [ -z "$trimmed_name" ]; then
+      echo "Repository name cannot be empty."
+      continue
+    fi
+    new_name="$trimmed_name"
+    case "$new_name" in
+      *$'\t'*)
+        echo "Repository name cannot contain tab characters."
+        continue
+        ;;
+    esac
+    if repo_name_exists_except "$new_name" "$rename_index"; then
+      echo "Repository name already exists: $new_name"
+      continue
+    fi
+
+    echo "Renaming $label from ${REPO_NAMES[$rename_index]} to $new_name"
+    REPO_NAMES[$rename_index]="$new_name"
+    return
+  done
 }
 
 resolve_duplicate_repo_names() {
@@ -1176,8 +1230,8 @@ resolve_duplicate_repo_names() {
         if [ "$second" -le "$first" ]; then
           continue
         fi
-        if [ "$(basename "${REPOS[$first]}")" = "$(basename "${REPOS[$second]}")" ]; then
-          duplicate_name="$(basename "${REPOS[$first]}")"
+        if [ "${REPO_NAMES[$first]}" = "${REPO_NAMES[$second]}" ]; then
+          duplicate_name="${REPO_NAMES[$first]}"
           break 2
         fi
       done
@@ -1200,18 +1254,28 @@ resolve_duplicate_repo_names() {
     if can_use_interactive_menu; then
       MENU_LABELS=(
         "Exit install"
+        "Rename A: ${REPOS[$first]}"
+        "Rename B: ${REPOS[$second]}"
         "Exclude A: ${REPOS[$first]}"
         "Exclude B: ${REPOS[$second]}"
       )
-      MENU_VALUES=(exit exclude-first exclude-second)
-      MENU_ENABLED=(1 1 1)
-      MENU_ROW_DETECTED=(0 0 0)
+      MENU_VALUES=(exit rename-first rename-second exclude-first exclude-second)
+      MENU_ENABLED=(1 1 1 1 1)
+      MENU_ROW_DETECTED=(0 0 0 0 0)
       MENU_ALL_DETECTED_MODE=0
       run_menu "Duplicate repository name action" "single" "Please choose how to resolve the duplicate repository name."
       case "$MENU_RESULT" in
         exit)
           echo "Install cancelled because duplicate repository names must be resolved."
           exit 1
+          ;;
+        rename-first)
+          rename_repo_index "$first" "A"
+          continue
+          ;;
+        rename-second)
+          rename_repo_index "$second" "B"
+          continue
           ;;
         exclude-first)
           echo "Excluding ${REPOS[$first]}"
@@ -1229,9 +1293,11 @@ resolve_duplicate_repo_names() {
     while true; do
       echo "Duplicate repository name action:"
       echo "  [1] Exit install"
-      echo "  [2] Exclude A: ${REPOS[$first]}"
-      echo "  [3] Exclude B: ${REPOS[$second]}"
-      read_user_line "Enter choice [1-3]: "
+      echo "  [2] Rename A: ${REPOS[$first]}"
+      echo "  [3] Rename B: ${REPOS[$second]}"
+      echo "  [4] Exclude A: ${REPOS[$first]}"
+      echo "  [5] Exclude B: ${REPOS[$second]}"
+      read_user_line "Enter choice [1-5]: "
       choice="$REPLY"
       case "$choice" in
         1)
@@ -1239,11 +1305,19 @@ resolve_duplicate_repo_names() {
           exit 1
           ;;
         2)
+          rename_repo_index "$first" "A"
+          break
+          ;;
+        3)
+          rename_repo_index "$second" "B"
+          break
+          ;;
+        4)
           echo "Excluding ${REPOS[$first]}"
           remove_repo_index "$first"
           break
           ;;
-        3)
+        5)
           echo "Excluding ${REPOS[$second]}"
           remove_repo_index "$second"
           break
@@ -1750,13 +1824,13 @@ mkdir -p "$INSTALL_TARGET_DIR/references"
 NODE_BIN="$(find_node)"
 REPO_FILE="$(mktemp)"
 TMP_FILES+=("$REPO_FILE")
-for repo_path in ${REPOS[@]+"${REPOS[@]}"}; do
-  printf '%s\t%s\n' "$repo_path" "$(detect_default_branch "$repo_path")" >> "$REPO_FILE"
+for repo_index in "${!REPOS[@]}"; do
+  repo_path="${REPOS[$repo_index]}"
+  printf '%s\t%s\t%s\n' "$repo_path" "${REPO_NAMES[$repo_index]}" "$(detect_default_branch "$repo_path")" >> "$REPO_FILE"
 done
 
 "$NODE_BIN" - "$INSTALL_TARGET_DIR/references/docmate.catalog.json" "$SCHEMA_VERSION" "$UPDATE_MODE" "$REPO_FILE" <<'EOF'
 const fs = require("node:fs");
-const path = require("node:path");
 
 const [, , catalogPath, schemaVersionRaw, updateMode, repoFile] = process.argv;
 
@@ -1764,9 +1838,9 @@ const repos = fs.readFileSync(repoFile, "utf8")
   .split(/\r?\n/)
   .filter(Boolean)
   .map((line) => {
-    const [repoPath, defaultBranch] = line.split("\t");
+    const [repoPath, repoName, defaultBranch] = line.split("\t");
     return {
-      name: path.basename(repoPath),
+      name: repoName,
       path: repoPath,
       baseBranchCandidates: [defaultBranch],
     };

@@ -440,6 +440,49 @@ def test_duplicate_repo_names_keep_first_in_non_interactive_install(tmp_path):
     assert [repo["path"] for repo in catalog["repos"]] == [str(repo_a)]
 
 
+def test_duplicate_repo_name_menu_can_rename_repository(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo_a = tmp_path / "team-a" / "engine-algo-store-service"
+    repo_b = tmp_path / "team-b" / "engine-algo-store-service"
+    repo_a.mkdir(parents=True)
+    repo_b.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_a, check=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_b, check=True)
+
+    bin_dir = fake_bin(home, [])
+    node_executable = Path(node_path()) / "node"
+    node_wrapper = bin_dir / "node"
+    node_wrapper.write_text(f"#!/usr/bin/env bash\nexec {node_executable} \"$@\"\n")
+    node_wrapper.chmod(0o755)
+
+    env = os.environ.copy()
+    env["HOME"] = str(home)
+    env["PATH"] = f"{bin_dir}:/usr/bin:/bin"
+    env["DOCMATE_USE_LOCAL_CACHE"] = "true"
+    env["TERM"] = "xterm"
+
+    command = (
+        f"bash {shlex.quote(str(ROOT / 'scripts' / 'install.sh'))} "
+        f"--language en --repo {shlex.quote(str(repo_a))} --repo {shlex.quote(str(repo_b))} "
+        "--hosts codex --existing overwrite --update-mode off"
+    )
+    result = run_pty_command(command, "\x1b[B\rcharts-engine-algo-store-service\r", env)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Duplicate repository name action" in result.stdout
+    assert "Rename A:" in result.stdout
+    assert "Renaming A from engine-algo-store-service to charts-engine-algo-store-service" in result.stdout
+    catalog = json.loads(
+        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
+    )
+    assert {repo["path"] for repo in catalog["repos"]} == {str(repo_a), str(repo_b)}
+    assert {repo["name"] for repo in catalog["repos"]} == {
+        "charts-engine-algo-store-service",
+        "engine-algo-store-service",
+    }
+
+
 def test_existing_host_directory_is_backed_up_before_linking(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
