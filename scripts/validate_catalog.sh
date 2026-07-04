@@ -108,11 +108,7 @@ if (!isObject(data)) {
   fail("root must be a JSON object");
 }
 
-requireKeysWithOptional(data, ["schemaVersion", "defaults", "repos"], ["installHosts"], "root");
-
-if (data.schemaVersion !== 2) {
-  fail("schemaVersion must be 2");
-}
+requireKeysWithOptional(data, ["defaults", "repos"], ["installHosts"], "root");
 
 const supportedHosts = new Set(["openclaw", "claude-code", "opencode", "codex", "hermes"]);
 if (Object.prototype.hasOwnProperty.call(data, "installHosts")) {

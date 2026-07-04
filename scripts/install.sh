@@ -2,7 +2,6 @@
 set -euo pipefail
 
 SKILL_SLUG="docmate"
-SCHEMA_VERSION=2
 SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
 SCRIPT_DIR=""
 ROOT_DIR=""
@@ -1829,10 +1828,10 @@ for repo_index in "${!REPOS[@]}"; do
   printf '%s\t%s\t%s\n' "$repo_path" "${REPO_NAMES[$repo_index]}" "$(detect_default_branch "$repo_path")" >> "$REPO_FILE"
 done
 
-"$NODE_BIN" - "$INSTALL_TARGET_DIR/references/docmate.catalog.json" "$SCHEMA_VERSION" "$UPDATE_MODE" "$REPO_FILE" <<'EOF'
+"$NODE_BIN" - "$INSTALL_TARGET_DIR/references/docmate.catalog.json" "$UPDATE_MODE" "$REPO_FILE" <<'EOF'
 const fs = require("node:fs");
 
-const [, , catalogPath, schemaVersionRaw, updateMode, repoFile] = process.argv;
+const [, , catalogPath, updateMode, repoFile] = process.argv;
 
 const repos = fs.readFileSync(repoFile, "utf8")
   .split(/\r?\n/)
@@ -1847,7 +1846,6 @@ const repos = fs.readFileSync(repoFile, "utf8")
   });
 
 const payload = {
-  schemaVersion: Number(schemaVersionRaw),
   defaults: {
     update: {
       mode: updateMode,

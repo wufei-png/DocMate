@@ -21,7 +21,6 @@ def valid_catalog(tmp_path: Path) -> dict:
     docs.mkdir()
     runbooks.mkdir()
     return {
-        "schemaVersion": 2,
         "defaults": {
             "update": {
                 "mode": "ask",
@@ -79,6 +78,18 @@ def test_accepts_legacy_install_hosts(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == "OK"
+
+
+def test_rejects_unsupported_root_keys(tmp_path):
+    payload = valid_catalog(tmp_path)
+    payload["metadata"] = {}
+    catalog_path = tmp_path / "docmate.catalog.json"
+    write_catalog(catalog_path, payload)
+
+    result = run_validator(catalog_path)
+
+    assert result.returncode != 0
+    assert "root contains unsupported key: metadata" in result.stderr
 
 
 def test_rejects_relative_paths(tmp_path):

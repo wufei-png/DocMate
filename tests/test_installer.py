@@ -185,6 +185,7 @@ def test_global_install_creates_canonical_skill_and_all_host_links(tmp_path):
     assert not (home / ".codex" / "skills" / "docmate").exists()
 
     catalog = json.loads((canonical / "references" / "docmate.catalog.json").read_text())
+    assert sorted(catalog) == ["defaults", "repos"]
     assert catalog["repos"][0]["name"] == "docs-project"
     assert catalog["repos"][0]["path"] == str(repo)
     assert "description" not in catalog["repos"][0]
@@ -755,6 +756,7 @@ def test_installer_generates_valid_starter_catalog(tmp_path):
     assert result.returncode == 0, result.stdout + result.stderr
     assert validate.returncode == 0, validate.stderr
     generated = json.loads(catalog.read_text())
+    assert sorted(generated) == ["defaults", "repos"]
     repo_entry = generated["repos"][0]
     assert "description" not in repo_entry
     assert "aliases" not in repo_entry
