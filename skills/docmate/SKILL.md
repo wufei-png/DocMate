@@ -7,7 +7,7 @@ description: "Use for project documentation QA: answer from docs, verify stale o
 
 ## Required Catalog Step
 
-Read `references/docmate.catalog.json` before selecting a repository. Do not guess from the current directory when the user has not named a repository.
+Use `references/docmate.catalog.json` as the repository-selection source. Do not guess from the current directory when the user has not named a repository. Check the catalog's line/byte count before selecting a repository: if it is small, read it directly; if it is large, do not load the entire file into context first. Instead, use targeted keyword search or structured filtering tools such as `rg` or `jq` against likely `name`, `description`, `aliases`, and `path` values, then read only the candidate entries needed for selection.
 
 Choose the repository by comparing the user's request with these catalog fields when present:
 

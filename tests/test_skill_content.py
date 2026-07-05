@@ -38,6 +38,9 @@ def test_skill_requires_catalog_before_repo_selection():
 
     assert "references/docmate.catalog.json" in content
     assert "before selecting a repository" in content
+    assert "line/byte count" in content
+    assert "do not load the entire file into context first" in content
+    assert "`rg` or `jq`" in content
     assert "aliases" in content
     assert "path" in content
     assert "docRoots" not in content

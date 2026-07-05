@@ -7,7 +7,7 @@ description: "用于项目文档 QA：基于文档回答问题，针对可能过
 
 ## 必读 Catalog 步骤
 
-选择仓库前，先读取 `references/docmate.catalog.json`。如果用户没有明确指定仓库，不要只根据当前目录猜测。
+选择仓库时，以 `references/docmate.catalog.json` 作为仓库选择依据。如果用户没有明确指定仓库，不要只根据当前目录猜测。选择前先用行数/字节数判断 catalog 是否适合直接阅读：小文件可以直接读；如果 catalog 很大，不要整文件读入上下文，先用 `rg` 或 `jq` 等工具，围绕可能匹配的 `name`、`description`、`aliases`、`path` 做关键词检索或结构化过滤，再只读取用于选择仓库的候选条目。
 
 选择仓库时，比较用户请求和 catalog 中已有的这些字段：
 
