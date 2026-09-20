@@ -1245,9 +1245,9 @@ resolve_duplicate_repo_names() {
     echo "  [B] ${REPOS[$second]}"
 
     if [ "$YES" -eq 1 ] || ! can_prompt; then
-      echo "Warning: keeping ${REPOS[$first]} and excluding ${REPOS[$second]}"
-      remove_repo_index "$second"
-      continue
+      echo "Error: repository name '$duplicate_name' conflicts between ${REPOS[$first]} and ${REPOS[$second]}." >&2
+      echo "Rename one repository during an interactive install, or exclude one path from --repo/--scan-root and retry." >&2
+      exit 1
     fi
 
     if can_use_interactive_menu; then

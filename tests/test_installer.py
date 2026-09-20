@@ -404,7 +404,8 @@ def test_interactive_update_mode_menu_writes_global_default(tmp_path):
     assert "update" not in catalog["repos"][0]
 
 
-def test_duplicate_repo_names_keep_first_in_non_interactive_install(tmp_path):
+@pytest.mark.parametrize("selection,yes", [("explicit", True), ("explicit", False), ("scan", True)])
+def test_duplicate_repo_names_fail_before_changing_existing_install(tmp_path, selection, yes):
     home = tmp_path / "home"
     home.mkdir()
     repo_a = tmp_path / "team-a" / "open-webui"
@@ -413,17 +414,23 @@ def test_duplicate_repo_names_keep_first_in_non_interactive_install(tmp_path):
     repo_b.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo_a, check=True)
     subprocess.run(["git", "init", "-q"], cwd=repo_b, check=True)
+    canonical = home / ".agents" / "skills" / "docmate"
+    canonical.mkdir(parents=True)
+    (canonical / "SKILL.md").write_text("existing skill\n")
+    (canonical / "references").mkdir()
+    (canonical / "references" / "docmate.catalog.json").write_text('{"existing": true}\n')
+
+    selection_args = (["--repo", str(repo_a), "--repo", str(repo_b)]
+                      if selection == "explicit" else
+                      ["--auto-scan", "--scan-root", str(tmp_path), "--scan-depth", "3"])
 
     result = run_install_args(
         home,
         [
             "bash",
             str(ROOT / "scripts" / "install.sh"),
-            "--yes",
-            "--repo",
-            str(repo_a),
-            "--repo",
-            str(repo_b),
+            *(["--yes"] if yes else []),
+            *selection_args,
             "--hosts",
             "codex",
             "--existing",
@@ -431,14 +438,13 @@ def test_duplicate_repo_names_keep_first_in_non_interactive_install(tmp_path):
         ],
     )
 
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode != 0
     assert "duplicate repository name detected: open-webui" in result.stdout
-    assert "duplicate repository name" not in result.stderr
-
-    catalog = json.loads(
-        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
-    )
-    assert [repo["path"] for repo in catalog["repos"]] == [str(repo_a)]
+    assert str(repo_a) in result.stderr and str(repo_b) in result.stderr
+    assert "Rename one repository" in result.stderr
+    assert (canonical / "SKILL.md").read_text() == "existing skill\n"
+    assert (canonical / "references" / "docmate.catalog.json").read_text() == '{"existing": true}\n'
+    assert backup_roots(home) == []
 
 
 def test_duplicate_repo_name_menu_can_rename_repository(tmp_path):
