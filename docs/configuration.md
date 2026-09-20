@@ -17,10 +17,10 @@ Important fields:
   Fill aliases manually when they would help agents route ambiguous requests.
 - `baseBranchCandidates`: ordered base branches for documentation repair.
   DocMate tries these when creating a temporary repair worktree. The installer
-  seeds this from each repository's detected remote default branch with `gh`,
-  `glab`, or `git`, then local HEAD, then fallback `main`; edit it after
-  installation when documentation repair should target a different branch such
-  as `develop`, `release/docs`, or `docs-main`.
+  seeds this from a remote default branch verified with `gh`, `glab`, or `git`.
+  If remote detection fails, local HEAD or `main` is an unverified candidate,
+  not a known remote default. Verify the remote base before repair and edit the
+  candidate when needed, such as `develop`, `release/docs`, or `docs-main`.
 - `defaults.update.mode`: global documentation repair mode for all repositories.
   `ask` is the installer default; use `auto` to repair high-confidence confirmed
   gaps without asking, or `off` to report gaps without editing. `auto` also

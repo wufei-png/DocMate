@@ -87,9 +87,10 @@ missing descriptions, open the one-time prompt at
 paste it into your own agent, and provide the actual catalog path printed by
 the installer. Fill `repos[].aliases` manually with short names users may type
 for the project.
-`repos[].baseBranchCandidates` is seeded from the detected remote default branch
-with `gh`, `glab`, or `git`, then local HEAD, then fallback `main`; edit it when
-documentation repair should target a different branch.
+`repos[].baseBranchCandidates` is seeded from a remote default branch verified
+with `gh`, `glab`, or `git`. If remote detection fails, local HEAD or `main` is
+an unverified candidate, not a known remote default. Verify the remote base
+before repair and edit the candidate when needed.
 
 `--project PATH` is still accepted as a backward-compatible alias for
 `--repo PATH`.

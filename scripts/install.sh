@@ -1521,17 +1521,21 @@ detect_default_branch() {
     fi
   fi
 
-  if [ -z "$branch" ]; then
-    branch="$(default_branch_from_local_head "$repo_path")"
+  if [ -n "$branch" ]; then
+    echo "Detected remote default branch for $(basename "$repo_path"): $branch" >&2
+    printf '%s\n' "$branch"
+    return
   fi
 
-  if [ -z "$branch" ]; then
-    branch="main"
-    echo "Warning: could not detect default branch for $repo_path; using fallback: $branch" >&2
-  else
-    echo "Detected default branch for $(basename "$repo_path"): $branch" >&2
+  branch="$(default_branch_from_local_head "$repo_path")"
+  if [ -n "$branch" ]; then
+    echo "Warning: remote default branch unverified for $repo_path; using local HEAD as an unverified candidate: $branch" >&2
+    printf '%s\n' "$branch"
+    return
   fi
 
+  branch="main"
+  echo "Warning: remote default branch unverified for $repo_path; using fallback main as an unverified candidate" >&2
   printf '%s\n' "$branch"
 }
 
@@ -1886,9 +1890,9 @@ echo "  $DESCRIPTION_PROMPT_URL"
 echo "  Provide this catalog path to the agent:"
 echo "  $INSTALL_TARGET_DIR/references/docmate.catalog.json"
 echo "- repos[].aliases: fill manually with short names users may type for the project."
-echo "- repos[].baseBranchCandidates: seeded from the detected remote default"
-echo "  branch via gh/glab/git, then local HEAD, then fallback main; edit it if"
-echo "  documentation repair should target another base branch."
+echo "- repos[].baseBranchCandidates: seeded from the remote default branch when"
+echo "  verified via gh/glab/git; otherwise local HEAD or main is an unverified"
+echo "  candidate. Verify the remote base before repair or edit the candidate."
 echo "- defaults.update.mode: global repair mode for all repos; current value:"
 echo "  $UPDATE_MODE"
 echo "============================================================"

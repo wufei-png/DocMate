@@ -803,6 +803,52 @@ def test_installer_uses_local_head_when_remote_default_is_unavailable(tmp_path):
         (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
     )
     assert catalog["repos"][0]["baseBranchCandidates"] == ["develop"]
+    assert "using local HEAD as an unverified candidate: develop" in result.stderr
+    assert "Detected remote default branch" not in result.stderr
+    assert "local HEAD or main is an unverified" in result.stdout
+
+
+def test_installer_marks_feature_branch_as_unverified_when_remote_is_unreachable(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(["git", "checkout", "-q", "-b", "feature/docs"], cwd=repo, check=True)
+    subprocess.run(["git", "remote", "add", "origin", str(tmp_path / "missing-remote")], cwd=repo, check=True)
+
+    result = run_install(home, repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    catalog = json.loads(
+        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
+    )
+    assert catalog["repos"][0]["baseBranchCandidates"] == ["feature/docs"]
+    assert "using local HEAD as an unverified candidate: feature/docs" in result.stderr
+    assert "Detected remote default branch" not in result.stderr
+
+
+def test_installer_marks_main_fallback_as_unverified_without_local_branch(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "init"],
+        cwd=repo, check=True,
+    )
+    subprocess.run(["git", "checkout", "-q", "--detach"], cwd=repo, check=True)
+
+    result = run_install(home, repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    catalog = json.loads(
+        (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
+    )
+    assert catalog["repos"][0]["baseBranchCandidates"] == ["main"]
+    assert "using fallback main as an unverified candidate" in result.stderr
+    assert "Detected remote default branch" not in result.stderr
 
 
 def test_installer_uses_glab_for_private_gitlab_default_branch(tmp_path):
@@ -844,6 +890,7 @@ def test_installer_uses_glab_for_private_gitlab_default_branch(tmp_path):
         (home / ".agents" / "skills" / "docmate" / "references" / "docmate.catalog.json").read_text()
     )
     assert catalog["repos"][0]["baseBranchCandidates"] == ["release/docs"]
+    assert "Detected remote default branch for gitlab-docs: release/docs" in result.stderr
 
 
 def test_installer_accepts_project_as_backward_compatible_alias(tmp_path):

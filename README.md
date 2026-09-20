@@ -168,9 +168,10 @@ For `single` installs, use the `Catalog:` path printed by the installer instead.
 Add repository aliases, descriptions, and base branch candidates as needed.
 Descriptions and aliases are optional catalog fields. Add them when project
 background or short names would help agents route vague requests.
-The installer seeds `baseBranchCandidates` from each repository's detected
-remote default branch with `gh`, `glab`, or `git`, then falls back to local HEAD
-and finally `main`; edit it only when the repair base should differ.
+The installer seeds `baseBranchCandidates` from a remote default branch verified
+with `gh`, `glab`, or `git`. If remote detection fails, local HEAD or `main` is
+an unverified candidate, not a known remote default. Verify the remote base
+before repair and edit the candidate when needed.
 The global repair behavior lives in `defaults.update.mode` and defaults to
 `ask`.
 
