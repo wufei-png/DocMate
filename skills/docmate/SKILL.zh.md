@@ -76,7 +76,7 @@ Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
 
 从 catalog 读取全局 `defaults.update.mode` 值。不支持仓库级 update mode。
 
-- `defaults.update.mode = ask`：先展示缺口报告中明确的文档和动作。当前用户对完整所列范围的一次明确确认，只授权该范围一次；在所列 edit、commit、push 和 PR/MR 步骤前不再重复询问。若用户只授权本地编辑，只编辑所列文档、检查本地 diff，并在任何 Git write、push 或 PR/MR 前停止。
+- `defaults.update.mode = ask`：先展示缺口报告中明确的文档和动作。当前用户对完整所列范围的一次明确确认，只授权该范围一次；在所列 edit、commit、push 和 PR/MR 步骤前不再重复询问。若用户只授权本地编辑，只在隔离 worktree 中编辑所列文档、检查本地 diff，并在暂存、commit、push 或 PR/MR 前停止。
 - `defaults.update.mode = auto`：仅当缺口高置信、文档和代码证据清楚、目标文档明确且修复是很小的纯文档改动时，才不询问直接继续。证据快照必须确认相关代码版本已为拟服务的文档读者发布；影响生成文档时，生成源到输出的关系也必须明确。否则只报告缺口，不自动修复或发布。
 - `defaults.update.mode = off`：报告缺口后停止。不创建 worktree、不编辑文件、不 commit、不 push，也不打开 PR/MR。
 
@@ -87,7 +87,7 @@ Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
 文档修复属于本 skill 工作流的一部分，不需要 subagent。
 
 1. 从 `baseBranchCandidates` 解析 base branch。不要硬编码分支名。
-2. 将缺口报告作为修复上下文。在 `ask` 模式下，如果当前用户已经在回答流程中确认其完整所列范围，不要重复询问；否则展示报告并等待对所列范围的确认后再编辑。只确认本地编辑时，在检查本地 diff 后结束流程。
+2. 将缺口报告作为修复上下文。在 `ask` 模式下，如果当前用户已经在回答流程中确认其完整所列范围，不要重复询问；否则展示报告并等待对所列范围的确认后再编辑。只确认本地编辑时，在隔离 worktree 中检查本地 diff 后结束流程，不暂存也不发布。
 3. 从选定 base branch 创建临时 git worktree。不要要求用户主 worktree 干净，但也不要修改它。只通过仓库对象库使用 git worktree。
 4. 如果目标文档已不再匹配确认过的缺口，或 upstream 已经修好，停止并返回 `already_fixed_upstream`。
 5. 为文档修复创建描述性分支名。

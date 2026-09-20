@@ -34,7 +34,8 @@ and list whether the proposed scope includes edit, commit, push, and opening a
 PR or MR. In `ask` mode, one explicit current-user confirmation of that complete
 listed scope authorizes it once; do not ask again before carrying out those
 listed steps. A narrower authorization for local editing permits only that edit
-and local diff review: stop before any Git write, push, or PR/MR.
+in the isolated worktree and local diff review: stop before staging, committing,
+pushing, or opening a PR/MR.
 
 `off` is report-only: do not create a worktree, edit, commit, push, or open a
 PR/MR. A preview request is also report-only and must stop before every Git
