@@ -71,8 +71,10 @@ for OpenClaw, Claude Code, OpenCode, and Hermes. Codex uses the canonical
 create a separate `~/.codex` link.
 
 When `--existing backup` replaces a real directory or file, the old target is
-moved under `${TMPDIR:-/tmp}/docmate-skill-backups/install-*`. Existing symlink
-install targets are unlinked and recreated, not backed up.
+moved under `${XDG_STATE_HOME:-$HOME/.local/state}/docmate/backups/install-*`.
+The installer prints the backup path on success and on failure after a backup.
+If an install is interrupted, use that path to restore the old Skill and catalog.
+Existing symlink install targets are unlinked and recreated, not backed up.
 
 After installation, edit:
 

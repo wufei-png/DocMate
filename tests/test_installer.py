@@ -38,6 +38,7 @@ def run_install_args(
     input_text: Optional[str] = None,
     timeout: int = 15,
     fake_commands: Optional[List[str]] = None,
+    extra_env: Optional[dict] = None,
 ):
     env = os.environ.copy()
     if fake_commands is None:
@@ -49,6 +50,9 @@ def run_install_args(
     node_wrapper.chmod(0o755)
     env["HOME"] = str(home)
     env["TMPDIR"] = str(home / "tmp")
+    env.pop("XDG_STATE_HOME", None)
+    if extra_env:
+        env.update(extra_env)
     path_entries = [str(bin_dir), "/usr/bin", "/bin"]
     if extra_path:
         path_entries.insert(0, str(extra_path))
@@ -66,7 +70,7 @@ def run_install_args(
 
 
 def backup_roots(home: Path) -> List[Path]:
-    backup_base = home / "tmp" / "docmate-skill-backups"
+    backup_base = home / ".local" / "state" / "docmate" / "backups"
     if not backup_base.exists():
         return []
     return sorted(backup_base.glob("install-*"))
@@ -575,7 +579,66 @@ def test_existing_canonical_directory_is_backed_up_before_reinstall(tmp_path):
     assert (canonical / "references" / "docmate.catalog.json").exists()
     assert not (canonical / "references" / "docmate.catalog.example.json").exists()
     assert str(roots[0]) in result.stdout
+    assert home / ".local" / "state" in roots[0].parents
+    assert not (home / "tmp" / "docmate-skill-backups").exists()
     assert not (home / ".agents" / "skills" / "docmate_backup_0").exists()
+
+
+def test_existing_backup_uses_xdg_state_home(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    canonical = home / ".agents" / "skills" / "docmate"
+    canonical.mkdir(parents=True)
+    (canonical / "SKILL.md").write_text("old skill\n")
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    state_home = tmp_path / "custom-state"
+
+    result = run_install_args(
+        home,
+        ["bash", str(ROOT / "scripts" / "install.sh"), "--yes", "--repo", str(repo),
+         "--hosts", "codex", "--existing", "backup"],
+        extra_env={"XDG_STATE_HOME": str(state_home)},
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    roots = list((state_home / "docmate" / "backups").glob("install-*"))
+    assert len(roots) == 1
+    assert (roots[0] / "canonical-docmate" / "SKILL.md").read_text() == "old skill\n"
+    assert str(roots[0]) in result.stdout
+
+
+def test_failed_install_reports_persistent_backup_path(tmp_path):
+    home = tmp_path / "home"
+    home.mkdir()
+    canonical = home / ".agents" / "skills" / "docmate"
+    references = canonical / "references"
+    references.mkdir(parents=True)
+    (canonical / "SKILL.md").write_text("old skill\n")
+    (references / "docmate.catalog.json").write_text('{"old": true}\n')
+    repo = tmp_path / "docs-project"
+    repo.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo, check=True)
+    fake_tools = tmp_path / "fake-tools"
+    fake_tools.mkdir()
+    fake_node = fake_tools / "node"
+    fake_node.write_text("#!/usr/bin/env bash\nexit 7\n")
+    fake_node.chmod(0o755)
+
+    result = run_install_args(
+        home,
+        ["bash", str(ROOT / "scripts" / "install.sh"), "--yes", "--repo", str(repo),
+         "--hosts", "codex", "--existing", "backup"],
+        extra_path=fake_tools,
+    )
+
+    assert result.returncode == 7, result.stdout + result.stderr
+    roots = backup_roots(home)
+    assert len(roots) == 1
+    assert (roots[0] / "canonical-docmate" / "SKILL.md").read_text() == "old skill\n"
+    assert (roots[0] / "canonical-docmate" / "references" / "docmate.catalog.json").read_text() == '{"old": true}\n'
+    assert str(roots[0]) in result.stderr
 
 
 def test_existing_canonical_and_host_directories_share_one_backup_root(tmp_path):

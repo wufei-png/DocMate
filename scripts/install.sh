@@ -99,7 +99,11 @@ MENU_MESSAGE=""
 MENU_ALL_DETECTED_MODE=0
 
 cleanup() {
+  local exit_status=$?
   local tmp_file
+  if [ "$exit_status" -ne 0 ] && [ "$BACKUP_OCCURRED" -eq 1 ]; then
+    print_backup_summary >&2
+  fi
   for tmp_file in ${TMP_FILES[@]+"${TMP_FILES[@]}"}; do
     [ -n "$tmp_file" ] && rm -f "$tmp_file"
   done
@@ -879,15 +883,12 @@ path_exists() {
 }
 
 ensure_backup_root() {
-  local temp_base="${TMPDIR:-/tmp}"
-  local backup_base=""
+  local backup_base="${XDG_STATE_HOME:-$HOME/.local/state}/docmate/backups"
 
   if [ -n "$BACKUP_ROOT" ]; then
     return
   fi
 
-  temp_base="${temp_base%/}"
-  backup_base="$temp_base/docmate-skill-backups"
   mkdir -p "$backup_base"
   BACKUP_ROOT="$(mktemp -d "$backup_base/install-$(date +%Y%m%d-%H%M%S)-XXXXXXXX")"
 }
@@ -1044,7 +1045,7 @@ print_backup_summary() {
   echo
   echo "Backups moved to:"
   echo "  $BACKUP_ROOT"
-  echo "Temporary backups are stored under the system temp directory and may be removed by the operating system later."
+  echo "Keep this path to restore the previous Skill and catalog if needed."
 }
 
 read_user_line() {
