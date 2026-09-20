@@ -80,22 +80,19 @@ Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
 - `defaults.update.mode = auto`：仅当缺口高置信、文档和代码证据清楚、目标文档明确且修复是很小的纯文档改动时，才不询问直接继续。证据快照必须确认相关代码版本已为拟服务的文档读者发布；影响生成文档时，生成源到输出的关系也必须明确。否则只报告缺口，不自动修复或发布。
 - `defaults.update.mode = off`：报告缺口后停止。不创建 worktree、不编辑文件、不 commit、不 push，也不打开 PR/MR。
 
-启用更新时，根据选中仓库的 git remotes 和可用原生命令推断托管平台与 push remote。如果托管平台或 remote 不明确，停止并报告 blocker。
+启用更新时，从所选文档仓库的 Git 配置确认仓库、精确源文档、托管平台及一个明确的 push remote/项目。不要隐式选第一个 remote；发布目标不明确时停止并报告 blocker。
 
 ## 文档修复流程
 
 文档修复属于本 skill 工作流的一部分，不需要 subagent。
 
-1. 从 `baseBranchCandidates` 解析 base branch。不要硬编码分支名。
-2. 将缺口报告作为修复上下文。在 `ask` 模式下，如果当前用户已经在回答流程中确认其完整所列范围，不要重复询问；否则展示报告并等待对所列范围的确认后再编辑。只确认本地编辑时，在隔离 worktree 中检查本地 diff 后结束流程，不暂存也不发布。
-3. 从选定 base branch 创建临时 git worktree。不要要求用户主 worktree 干净，但也不要修改它。只通过仓库对象库使用 git worktree。
-4. 如果目标文档已不再匹配确认过的缺口，或 upstream 已经修好，停止并返回 `already_fixed_upstream`。
-5. 为文档修复创建描述性分支名。
-6. 做能修复已验证缺口的最小纯文档改动。如果缺口影响由 GitLab CI 或脚本生成的文档，编辑生成源文件，而不是会被覆盖的生成输出。在 `auto` 中，如果无法确认生成源到输出的关系，停止。
-7. 提交前检查 `git status --short` 和 `git diff`。如果代码或无关文件发生变化，停止并报告 blocker。
-8. 提交、push，并用从 git remotes 推断出的原生命令打开 pull request 或 merge request：
-   - GitHub remotes 使用 `gh pr create`。
-   - GitLab remotes 使用 `glab mr create`。
+1. 用缺口报告确定范围。`ask` 已获当前用户对所列完整范围的确认时只使用一次，无需重复询问；尚未授权则在编辑前确认。只授权本地编辑时，隔离 worktree 中检查 diff 后停止，不暂存或发布。`off` 和预览在任何 Git 写入（包括创建 worktree）前停止。
+2. 核对选定 push remote 的 URL、托管平台，查询该 remote 上每个 `baseBranchCandidates` 候选分支及默认分支。Catalog 候选只是线索，不能证明远端分支存在或是默认分支。写入前将选定远端分支解析为精确 SHA。`auto` 在默认分支不明或选定 base 与默认分支不一致时停止；`ask` 使用非默认 base 需要当前用户明确授权并指明该 base。base 或 remote 状态不明均为 blocker。记录 remote、项目、base ref 和 SHA。
+3. 分配唯一临时目录和未占用的描述性分支名，再从该 base SHA 使用 `git worktree add -b`。允许主工作树 dirty，但绝不 stash、reset 或 clean。分支已存在时换一个唯一名称，不复用或覆盖。
+4. 在新 worktree 中重新核对源文档与缺口，确保每个目标是仓库内的文档源路径，不是符号链接或来源不明的生成输出。若缺口已修复，返回 `already_fixed_upstream` 并安全移除 clean worktree。
+5. 做最小的纯文档改动。若 GitLab CI 或脚本生成文档，编辑已知生成源文件；源与输出关系不明时停止 `auto`。
+6. 检查 `git status --short --untracked-files=all` 和 `git diff`，只暂存明确目标的文档源路径，再检查 `git diff --cached` 和 `git diff --cached --check`。代码或无关文件变化时停止并报告 blocker。只有完整发布授权或有效 `auto` 策略才提交。
+7. 提交后才进入远端对账与发布。无 patch 的 clean worktree 或已确认发布成功的 clean worktree 可用 `git worktree remove` 移除。有未提交 patch、已提交未推送或远端结果不明时保留 worktree，报告绝对路径、分支、已有 commit 和恢复办法。不要用文件系统删除 worktree，也不要丢弃其中内容。
 
 ## 安全规则
 

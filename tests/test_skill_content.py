@@ -102,6 +102,36 @@ def test_skill_has_gap_report_and_update_mode_rules():
     assert "Out of scope" not in content
 
 
+def test_repair_target_and_worktree_lifecycle_are_in_all_templates():
+    english = SKILL.read_text()
+    chinese = SKILL_ZH.read_text()
+
+    assert english == SKILL_EN.read_text()
+    for rule in (
+        "Do not select the first remote implicitly",
+        "Catalog candidates are hints",
+        "selected base differs from it",
+        "exact base SHA",
+        "git worktree add -b",
+        "git status --short --untracked-files=all",
+        "git diff --cached --check",
+        "git worktree remove",
+        "uncommitted patch, an unpushed commit, or an uncertain remote result",
+    ):
+        assert rule in english
+    for rule in (
+        "不要隐式选第一个 remote",
+        "Catalog 候选只是线索",
+        "base SHA",
+        "git worktree add -b",
+        "git status --short --untracked-files=all",
+        "git diff --cached --check",
+        "git worktree remove",
+        "未提交 patch、已提交未推送或远端结果不明",
+    ):
+        assert rule in chinese
+
+
 def test_skill_has_no_internal_project_terms():
     content = SKILL.read_text()
 
