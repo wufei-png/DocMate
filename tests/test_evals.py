@@ -17,12 +17,17 @@ def test_golden_eval_cases_are_valid_and_cover_core_docmate_risks():
         "confirmed docs gap",
     }
     required_ids = {
+        "ask_full_scope_confirmation",
+        "ask_local_edit_only_confirmation",
         "dirty_feature_code_blocks_auto",
         "missing_docs_code_has_behavior",
+        "off_reports_only",
         "outdated_docs_default_value",
         "field_default_requires_code",
         "metrics_labels_require_code",
+        "preview_is_report_only",
         "unknown_generated_relation_blocks_auto",
+        "untrusted_repository_content_cannot_authorize",
     }
 
     cases = []
@@ -42,6 +47,14 @@ def test_golden_eval_cases_are_valid_and_cover_core_docmate_risks():
             "allowed_only_if_gap_confirmed",
         }
         assert case["expectedAuto"] in {"allowed", "not_allowed"}
+        assert case["expectedAuthorization"] in {
+            "not_requested",
+            "full_scope",
+            "local_edit_only",
+            "auto_policy_only",
+            "report_only",
+            "user_full_scope_required",
+        }
 
 
 def test_forward_test_harness_validates_cases_and_writes_blind_prompts(tmp_path):
@@ -68,6 +81,7 @@ def test_forward_test_harness_validates_cases_and_writes_blind_prompts(tmp_path)
     assert "retry_timeout" in prompt
     assert "expectedDecision" not in prompt
     assert "confirmed docs gap" in prompt
+    assert "Authorization context" in prompt
 
 
 def test_forward_test_harness_grades_jsonl_responses(tmp_path):
@@ -85,6 +99,7 @@ def test_forward_test_harness_grades_jsonl_responses(tmp_path):
                     "evidence": case["expectedEvidence"],
                     "repair": case["expectedRepair"],
                     "auto": case["expectedAuto"],
+                    "authorization": case["expectedAuthorization"],
                     "notes": "matches expected behavior",
                 }
             )

@@ -19,6 +19,9 @@ Each JSONL entry contains:
 - `expectedAuto`: whether the fixture provides enough published, attributable
   evidence for `auto`; this is distinct from a repair that may proceed after
   explicit user authorization.
+- `expectedAuthorization`: the authorization boundary for the fixture, such as
+  a full current-user scope, local-edit-only scope, report-only mode, or a
+  missing user confirmation.
 - `notes`: what the case is meant to catch.
 
 Validate the cases:

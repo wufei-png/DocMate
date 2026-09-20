@@ -30,6 +30,14 @@ ALLOWED_REPAIR = {
     "allowed_only_if_gap_confirmed",
 }
 ALLOWED_AUTO = {"allowed", "not_allowed"}
+ALLOWED_AUTHORIZATION = {
+    "not_requested",
+    "full_scope",
+    "local_edit_only",
+    "auto_policy_only",
+    "report_only",
+    "user_full_scope_required",
+}
 
 
 def load_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -80,6 +88,12 @@ def validate_cases(cases: Iterable[Dict[str, Any]]) -> None:
         if auto not in ALLOWED_AUTO:
             raise ValueError(f"{case_id}: unsupported expectedAuto: {auto}")
 
+        authorization = require_string(case, "expectedAuthorization")
+        if authorization not in ALLOWED_AUTHORIZATION:
+            raise ValueError(
+                f"{case_id}: unsupported expectedAuthorization: {authorization}"
+            )
+
 
 def require_string(payload: Dict[str, Any], key: str) -> str:
     value = payload.get(key)
@@ -107,6 +121,7 @@ def prompt_for_case(case: Dict[str, Any], skill_path: Path) -> str:
             f"- Documentation evidence: {fixture.get('docs', 'none')}",
             f"- Code evidence: {fixture.get('code', 'none')}",
             f"- External evidence: {fixture.get('external', 'none')}",
+            f"- Authorization context: {fixture.get('authorization', 'none')}",
             "",
             "Return exactly one JSON object with these fields:",
             "- id",
@@ -114,6 +129,7 @@ def prompt_for_case(case: Dict[str, Any], skill_path: Path) -> str:
             "- evidence: array of evidence categories used, such as docs or code",
             "- repair: not_allowed | allowed_when_high_confidence | allowed_only_if_gap_confirmed",
             "- auto: allowed | not_allowed",
+            "- authorization: not_requested | full_scope | local_edit_only | auto_policy_only | report_only | user_full_scope_required",
             "- notes: one concise sentence",
             "",
         ]
@@ -161,6 +177,13 @@ def grade(cases: Iterable[Dict[str, Any]], responses: Iterable[Dict[str, Any]]) 
         auto = response.get("auto")
         if auto != case["expectedAuto"]:
             failures.append(f"{case_id}: auto {auto!r} != {case['expectedAuto']!r}")
+
+        authorization = response.get("authorization")
+        if authorization != case["expectedAuthorization"]:
+            failures.append(
+                f"{case_id}: authorization {authorization!r} != "
+                f"{case['expectedAuthorization']!r}"
+            )
 
         evidence = response.get("evidence")
         if not isinstance(evidence, list):
