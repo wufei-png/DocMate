@@ -2,6 +2,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -138,7 +140,44 @@ def test_rejects_cross_repo_duplicate_aliases(tmp_path):
     result = run_validator(catalog_path)
 
     assert result.returncode != 0
-    assert "alias already used by repository docs-site: docs" in result.stderr
+    assert "repos[1].aliases[0] (docs) conflicts with repos[0].aliases[0] (docs)" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "first_field,first_value,second_field,second_value",
+    [
+        ("name", "docs-site", "name", "DOCS-SITE"),
+        ("name", "docs-site", "aliases", "DOCS-SITE"),
+        ("aliases", "Ｄｏｃｓ", "name", "docs"),
+        ("aliases", "RunBooks", "aliases", "runbooks"),
+    ],
+)
+def test_rejects_cross_repo_normalized_name_conflicts(
+    tmp_path, first_field, first_value, second_field, second_value
+):
+    payload = valid_catalog(tmp_path)
+    payload["repos"][0][first_field] = [first_value] if first_field == "aliases" else first_value
+    payload["repos"][1][second_field] = [second_value] if second_field == "aliases" else second_value
+    catalog_path = tmp_path / "docmate.catalog.json"
+    write_catalog(catalog_path, payload)
+
+    result = run_validator(catalog_path)
+
+    assert result.returncode != 0
+    assert "repos[0]." in result.stderr
+    assert "repos[1]." in result.stderr
+    assert first_value in result.stderr and second_value in result.stderr
+
+
+def test_allows_name_reused_as_alias_within_same_repo(tmp_path):
+    payload = valid_catalog(tmp_path)
+    payload["repos"][0]["aliases"] = ["DOCS-SITE"]
+    catalog_path = tmp_path / "docmate.catalog.json"
+    write_catalog(catalog_path, payload)
+
+    result = run_validator(catalog_path)
+
+    assert result.returncode == 0, result.stderr
 
 
 def test_rejects_repo_level_update_mode(tmp_path):

@@ -146,9 +146,19 @@ if (!Array.isArray(data.repos) || data.repos.length === 0) {
   fail("repos must be a non-empty array");
 }
 
-const seenRepoNames = new Set();
+const seenRepoLabels = new Map();
 const seenRepoPaths = new Set();
-const seenRepoAliases = new Map();
+function checkRepoLabel(value, field, repoIndex) {
+  const key = value.normalize("NFKC").toLowerCase();
+  const previous = seenRepoLabels.get(key);
+  if (previous && previous.repoIndex !== repoIndex) {
+    fail(`${field} (${value}) conflicts with ${previous.field} (${previous.value}) in another repository`);
+  }
+  if (!previous) {
+    seenRepoLabels.set(key, { repoIndex, field, value });
+  }
+}
+
 for (const [repoIndex, repo] of data.repos.entries()) {
   if (!isObject(repo)) {
     fail(`repos[${repoIndex}] must be an object`);
@@ -164,10 +174,7 @@ for (const [repoIndex, repo] of data.repos.entries()) {
   );
 
   requireString(repo.name, `repos[${repoIndex}].name`);
-  if (seenRepoNames.has(repo.name)) {
-    fail(`repos contains a duplicate repository name: ${repo.name}`);
-  }
-  seenRepoNames.add(repo.name);
+  checkRepoLabel(repo.name, `repos[${repoIndex}].name`, repoIndex);
 
   if (Object.prototype.hasOwnProperty.call(repo, "description")) {
     requireString(repo.description, `repos[${repoIndex}].description`, { allowEmpty: true });
@@ -183,17 +190,8 @@ for (const [repoIndex, repo] of data.repos.entries()) {
 
   if (Object.prototype.hasOwnProperty.call(repo, "aliases")) {
     requireStringArray(repo.aliases, `repos[${repoIndex}].aliases`);
-    const seenAliases = new Set();
-    for (const alias of repo.aliases) {
-      if (seenAliases.has(alias)) {
-        fail(`repos[${repoIndex}] contains a duplicate alias: ${alias}`);
-      }
-      if (seenRepoAliases.has(alias)) {
-        const firstRepoName = seenRepoAliases.get(alias);
-        fail(`repos[${repoIndex}].aliases contains alias already used by repository ${firstRepoName}: ${alias}`);
-      }
-      seenAliases.add(alias);
-      seenRepoAliases.set(alias, repo.name);
+    for (const [aliasIndex, alias] of repo.aliases.entries()) {
+      checkRepoLabel(alias, `repos[${repoIndex}].aliases[${aliasIndex}]`, repoIndex);
     }
   }
 
