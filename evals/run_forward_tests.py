@@ -29,6 +29,7 @@ ALLOWED_REPAIR = {
     "allowed_when_high_confidence",
     "allowed_only_if_gap_confirmed",
 }
+ALLOWED_AUTO = {"allowed", "not_allowed"}
 
 
 def load_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -75,6 +76,10 @@ def validate_cases(cases: Iterable[Dict[str, Any]]) -> None:
         if repair not in ALLOWED_REPAIR:
             raise ValueError(f"{case_id}: unsupported expectedRepair: {repair}")
 
+        auto = require_string(case, "expectedAuto")
+        if auto not in ALLOWED_AUTO:
+            raise ValueError(f"{case_id}: unsupported expectedAuto: {auto}")
+
 
 def require_string(payload: Dict[str, Any], key: str) -> str:
     value = payload.get(key)
@@ -108,6 +113,7 @@ def prompt_for_case(case: Dict[str, Any], skill_path: Path) -> str:
             "- decision: docs-only ok | must verify code | insufficient evidence | confirmed docs gap",
             "- evidence: array of evidence categories used, such as docs or code",
             "- repair: not_allowed | allowed_when_high_confidence | allowed_only_if_gap_confirmed",
+            "- auto: allowed | not_allowed",
             "- notes: one concise sentence",
             "",
         ]
@@ -151,6 +157,10 @@ def grade(cases: Iterable[Dict[str, Any]], responses: Iterable[Dict[str, Any]]) 
         repair = response.get("repair")
         if repair != case["expectedRepair"]:
             failures.append(f"{case_id}: repair {repair!r} != {case['expectedRepair']!r}")
+
+        auto = response.get("auto")
+        if auto != case["expectedAuto"]:
+            failures.append(f"{case_id}: auto {auto!r} != {case['expectedAuto']!r}")
 
         evidence = response.get("evidence")
         if not isinstance(evidence, list):

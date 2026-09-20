@@ -17,10 +17,12 @@ def test_golden_eval_cases_are_valid_and_cover_core_docmate_risks():
         "confirmed docs gap",
     }
     required_ids = {
+        "dirty_feature_code_blocks_auto",
         "missing_docs_code_has_behavior",
         "outdated_docs_default_value",
         "field_default_requires_code",
         "metrics_labels_require_code",
+        "unknown_generated_relation_blocks_auto",
     }
 
     cases = []
@@ -39,6 +41,7 @@ def test_golden_eval_cases_are_valid_and_cover_core_docmate_risks():
             "allowed_when_high_confidence",
             "allowed_only_if_gap_confirmed",
         }
+        assert case["expectedAuto"] in {"allowed", "not_allowed"}
 
 
 def test_forward_test_harness_validates_cases_and_writes_blind_prompts(tmp_path):
@@ -81,6 +84,7 @@ def test_forward_test_harness_grades_jsonl_responses(tmp_path):
                     "decision": case["expectedDecision"],
                     "evidence": case["expectedEvidence"],
                     "repair": case["expectedRepair"],
+                    "auto": case["expectedAuto"],
                     "notes": "matches expected behavior",
                 }
             )

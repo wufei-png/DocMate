@@ -16,6 +16,9 @@ Each JSONL entry contains:
 - `expectedDecision`: one of `docs-only ok`, `must verify code`, `insufficient evidence`, or `confirmed docs gap`.
 - `expectedEvidence`: required evidence categories.
 - `expectedRepair`: whether documentation repair is allowed.
+- `expectedAuto`: whether the fixture provides enough published, attributable
+  evidence for `auto`; this is distinct from a repair that may proceed after
+  explicit user authorization.
 - `notes`: what the case is meant to catch.
 
 Validate the cases:

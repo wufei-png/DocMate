@@ -23,7 +23,10 @@ Important fields:
   as `develop`, `release/docs`, or `docs-main`.
 - `defaults.update.mode`: global documentation repair mode for all repositories.
   `ask` is the installer default; use `auto` to repair high-confidence confirmed
-  gaps without asking, or `off` to report gaps without editing.
+  gaps without asking, or `off` to report gaps without editing. `auto` also
+  requires a recorded, published code revision for the intended documentation
+  audience; dirty/untracked or feature-branch-only behavior is local development
+  evidence and cannot by itself trigger automatic publication.
 
 `baseBranchCandidates` belongs in the catalog because the correct base branch is
 repository-specific and can differ between documentation repositories. Keep the
@@ -44,6 +47,14 @@ Provider, branch naming, and push remote are intentionally not catalog fields.
 During documentation repair, DocMate infers GitHub versus GitLab from git
 remotes and available native tools, chooses a descriptive branch name, and lets
 git/`gh`/`glab` use the appropriate remote context.
+
+For code-verified answers and repairs, the Skill records the docs and related
+code repositories separately: path, checked `HEAD`, checked ref, and clean or
+dirty worktree state. A repair report also records the intended docs remote/base
+and how the code revision is published for that audience. These are task
+evidence, not catalog fields. If generated documentation is involved, `auto`
+also requires a known source-to-output relationship; an unknown relationship
+stops automatic repair.
 
 New catalogs contain only runtime routing and repair fields. Older catalogs may
 still include `installHosts`; the validator accepts it for compatibility, but

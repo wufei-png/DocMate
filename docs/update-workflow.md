@@ -6,15 +6,26 @@ The safe path is:
 
 1. Answer the original question.
 2. Produce a user-facing gap report with document and code evidence.
-3. Follow `defaults.update.mode`. In `ask` mode, do not ask again if the user
+3. For code-verified answers and repair, record both repository snapshots in
+   that report: path, `HEAD`, checked ref, and clean or dirty (including
+   untracked) worktree state. When repair is considered, record the docs push
+   remote/base and whether the related code revision is published for that
+   documentation audience. A docs-only answer does not need Git/version checks.
+4. Follow `defaults.update.mode`. In `ask` mode, do not ask again if the user
    already confirmed repair during the answer workflow.
-4. Create a temporary git worktree from a configured base branch without
+5. In `auto`, continue only when a cleanly attributable code revision is
+   published for the intended docs audience. Dirty/untracked code or a
+   feature-branch-only behavior may be reported as local development evidence,
+   but cannot by itself trigger automatic publication. If generated docs are
+   affected, the source-to-output relationship must be known; otherwise stop
+   automatic repair and report the gap.
+6. Create a temporary git worktree from a configured base branch without
    modifying or requiring a clean main worktree.
-5. Stop with `already_fixed_upstream` if the target docs no longer match the
+7. Stop with `already_fixed_upstream` if the target docs no longer match the
    confirmed gap.
-6. Apply the smallest doc-only fix.
-7. Review the changed files with `git status --short` and `git diff`.
-8. Commit, push, and open a GitHub PR or GitLab MR with native git tooling.
+8. Apply the smallest doc-only fix.
+9. Review the changed files with `git status --short` and `git diff`.
+10. Commit, push, and open a GitHub PR or GitLab MR with native git tooling.
 
 The skill does not require a helper script. A typical repair command sequence is:
 

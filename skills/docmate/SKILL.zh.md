@@ -22,6 +22,10 @@ description: "用于项目文档 QA：基于文档回答问题，针对可能过
 
 当文档和代码冲突时，把代码视为运行时行为的事实来源；除非有生成文档能证明文档正确，否则将文档报告为过期。
 
+对 `must verify code` 和文档修复路径，在决定缺口能否自动修复前记录证据快照。`docs-only ok` 的回答不得执行 Git/版本核验。分别记录文档仓库和相关代码仓库的路径、已核对的 `HEAD`、已核对的 ref（或 detached 状态）、工作树是否 clean/dirty（包括 untracked 文件）。考虑修复时，还要记录拟发布文档的目标（push remote 和 base branch），以及相关代码版本与该目标或已发布 release 的关系。
+
+将生成输出作为文档证据，将已知的生成源作为修复文件；历史文档不能证明当前行为。生成源到输出的关系不明时，停止 `auto`。dirty/untracked 的代码，或仅存在于 feature branch 的行为，可以在标注为本地开发证据后用于回答，但不能单独启用 `auto` 发布。不要仅根据本地分支名推断代码已发布：如果无法确认它与拟服务的文档读者的关系，标记为 `local development` 或 `unknown`，且不得据此启用 `auto`。
+
 ## 回答流程
 
 1. 在选中仓库的 `path` 下工作。
@@ -53,6 +57,10 @@ Original question: <user question>
 Doc evidence: <paths or none found>
 Code evidence: <paths or commands checked>
 Target docs repo: <selected repo name and path>
+Evidence snapshots:
+  Docs repo: <path; HEAD; ref; clean/dirty; planned remote/base or n/a>
+  Related code repo: <path; HEAD; ref; clean/dirty; published relationship>
+Evidence status: <published | local development | unknown>
 Affected docs: <candidate doc files>
 Suggested fix: <smallest doc-only change>
 Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
@@ -65,7 +73,7 @@ Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
 从 catalog 读取全局 `defaults.update.mode` 值。不支持仓库级 update mode。
 
 - `defaults.update.mode = ask`：任何编辑前都询问用户。只有得到明确确认后才继续。
-- `defaults.update.mode = auto`：仅当缺口高置信、文档和代码证据清楚、目标文档明确且修复是很小的纯文档改动时，才不询问直接继续。
+- `defaults.update.mode = auto`：仅当缺口高置信、文档和代码证据清楚、目标文档明确且修复是很小的纯文档改动时，才不询问直接继续。证据快照必须确认相关代码版本已为拟服务的文档读者发布；影响生成文档时，生成源到输出的关系也必须明确。否则只报告缺口，不自动修复或发布。
 - `defaults.update.mode = off`：报告缺口后停止。不编辑文件。
 
 启用更新时，根据选中仓库的 git remotes 和可用原生命令推断托管平台与 push remote。如果托管平台或 remote 不明确，停止并报告 blocker。
@@ -79,7 +87,7 @@ Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
 3. 从选定 base branch 创建临时 git worktree。不要要求用户主 worktree 干净，但也不要修改它。只通过仓库对象库使用 git worktree。
 4. 如果目标文档已不再匹配确认过的缺口，或 upstream 已经修好，停止并返回 `already_fixed_upstream`。
 5. 为文档修复创建描述性分支名。
-6. 做能修复已验证缺口的最小纯文档改动。如果缺口影响由 GitLab CI 或脚本生成的文档，编辑生成源文件，而不是会被覆盖的生成输出。
+6. 做能修复已验证缺口的最小纯文档改动。如果缺口影响由 GitLab CI 或脚本生成的文档，编辑生成源文件，而不是会被覆盖的生成输出。在 `auto` 中，如果无法确认生成源到输出的关系，停止。
 7. 提交前检查 `git status --short` 和 `git diff`。如果代码或无关文件发生变化，停止并报告 blocker。
 8. 提交、push，并用从 git remotes 推断出的原生命令打开 pull request 或 merge request：
    - GitHub remotes 使用 `gh pr create`。
