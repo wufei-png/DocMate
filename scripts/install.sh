@@ -1169,17 +1169,26 @@ repo_name_exists_except() {
   local repo_name="$1"
   local skip_index="$2"
   local index=0
+  local name_key=""
+  local existing_key=""
+
+  name_key="$(normalize_repo_name "$repo_name")" || exit 1
 
   for index in "${!REPO_NAMES[@]}"; do
     if [ "$index" -eq "$skip_index" ]; then
       continue
     fi
-    if [ "${REPO_NAMES[$index]}" = "$repo_name" ]; then
+    existing_key="$(normalize_repo_name "${REPO_NAMES[$index]}")" || exit 1
+    if [ "$existing_key" = "$name_key" ]; then
       return 0
     fi
   done
 
   return 1
+}
+
+normalize_repo_name() {
+  "$NODE_BIN" -e 'process.stdout.write(process.argv[1].normalize("NFKC").toLowerCase())' "$1"
 }
 
 rename_repo_index() {
@@ -1219,6 +1228,8 @@ resolve_duplicate_repo_names() {
   local second=0
   local duplicate_name=""
   local choice=""
+  local first_key=""
+  local second_key=""
 
   while true; do
     duplicate_name=""
@@ -1226,11 +1237,13 @@ resolve_duplicate_repo_names() {
     second=0
 
     for first in "${!REPOS[@]}"; do
+      first_key="$(normalize_repo_name "${REPO_NAMES[$first]}")" || exit 1
       for second in "${!REPOS[@]}"; do
         if [ "$second" -le "$first" ]; then
           continue
         fi
-        if [ "${REPO_NAMES[$first]}" = "${REPO_NAMES[$second]}" ]; then
+        second_key="$(normalize_repo_name "${REPO_NAMES[$second]}")" || exit 1
+        if [ "$first_key" = "$second_key" ]; then
           duplicate_name="${REPO_NAMES[$first]}"
           break 2
         fi
@@ -1802,6 +1815,7 @@ if [ "${#REPOS[@]}" -eq 0 ]; then
   discover_repos_interactive
 fi
 
+NODE_BIN="$(find_node)"
 resolve_duplicate_repo_names
 select_update_mode_interactive
 echo "Selected documentation repair mode: $UPDATE_MODE"
@@ -1825,7 +1839,6 @@ fi
 deploy_skill_file
 mkdir -p "$INSTALL_TARGET_DIR/references"
 
-NODE_BIN="$(find_node)"
 REPO_FILE="$(mktemp)"
 TMP_FILES+=("$REPO_FILE")
 for repo_index in "${!REPOS[@]}"; do

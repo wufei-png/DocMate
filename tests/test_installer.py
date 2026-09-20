@@ -451,6 +451,36 @@ def test_duplicate_repo_names_fail_before_changing_existing_install(tmp_path, se
     assert backup_roots(home) == []
 
 
+@pytest.mark.parametrize("names", [("Docs", "docs"), ("Ｄｏｃｓ", "docs")])
+def test_normalized_duplicate_repo_names_fail_before_changing_existing_install(tmp_path, names):
+    home = tmp_path / "home"
+    home.mkdir()
+    repo_a = tmp_path / "team-a" / names[0]
+    repo_b = tmp_path / "team-b" / names[1]
+    repo_a.mkdir(parents=True)
+    repo_b.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_a, check=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_b, check=True)
+    canonical = home / ".agents" / "skills" / "docmate"
+    references = canonical / "references"
+    references.mkdir(parents=True)
+    (canonical / "SKILL.md").write_text("old skill\n")
+    (references / "docmate.catalog.json").write_text('{"old": true}\n')
+
+    result = run_install_args(
+        home,
+        ["bash", str(ROOT / "scripts" / "install.sh"), "--yes",
+         "--repo", str(repo_a), "--repo", str(repo_b),
+         "--hosts", "codex", "--existing", "backup"],
+    )
+
+    assert result.returncode != 0
+    assert str(repo_a) in result.stderr and str(repo_b) in result.stderr
+    assert (canonical / "SKILL.md").read_text() == "old skill\n"
+    assert (references / "docmate.catalog.json").read_text() == '{"old": true}\n'
+    assert backup_roots(home) == []
+
+
 def test_duplicate_repo_name_menu_can_rename_repository(tmp_path):
     home = tmp_path / "home"
     home.mkdir()
@@ -623,7 +653,12 @@ def test_failed_install_reports_persistent_backup_path(tmp_path):
     fake_tools = tmp_path / "fake-tools"
     fake_tools.mkdir()
     fake_node = fake_tools / "node"
-    fake_node.write_text("#!/usr/bin/env bash\nexit 7\n")
+    real_node = Path(node_path()) / "node"
+    fake_node.write_text(
+        f"#!/usr/bin/env bash\n"
+        f"if [ \"$1\" = '-e' ]; then exec {shlex.quote(str(real_node))} \"$@\"; fi\n"
+        "exit 7\n"
+    )
     fake_node.chmod(0o755)
 
     result = run_install_args(
