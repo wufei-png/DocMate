@@ -132,6 +132,36 @@ def test_repair_target_and_worktree_lifecycle_are_in_all_templates():
         assert rule in chinese
 
 
+def test_repair_publication_requires_reconciliation_in_all_templates():
+    english = SKILL.read_text()
+    chinese = SKILL_ZH.read_text()
+
+    assert english == SKILL_EN.read_text()
+    for rule in (
+        "reuse the known repair worktree and branch",
+        "git ls-remote --exit-code",
+        "A different SHA, malformed response, or any other exit status",
+        "Never force push",
+        "a failed or incomplete query is not an empty result",
+        "gh pr create --repo <project> --head <branch> --base <base>",
+        "glab mr create --repo <project> --source-branch <branch> --target-branch <base>",
+        "Query the same exact open review after create",
+        "do not blindly retry create",
+    ):
+        assert rule in english
+    for rule in (
+        "复用已知修复 worktree 和分支",
+        "git ls-remote --exit-code",
+        "绝不 force push",
+        "查询失败或不完整不等于空结果",
+        "gh pr create --repo <project> --head <branch> --base <base>",
+        "glab mr create --repo <project> --source-branch <branch> --target-branch <base>",
+        "create 成功或返回不确定错误后，都再次查询",
+        "不盲目重试 create",
+    ):
+        assert rule in chinese
+
+
 def test_skill_has_no_internal_project_terms():
     content = SKILL.read_text()
 

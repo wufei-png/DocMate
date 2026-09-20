@@ -60,8 +60,8 @@ flowchart TD
     AutoAllowed -->|No| StopNoEdit
     AutoAllowed -->|Yes| RepairReady
 
-    RepairReady --> ResolveBase[Resolve base branch from baseBranchCandidates]
-    ResolveBase --> Worktree[Create temporary git worktree]
+    RepairReady --> ResolveBase[Verify base SHA and default branch on explicit push remote]
+    ResolveBase --> Worktree[Create unique temporary git worktree]
     Worktree --> Recheck[Recheck target docs against confirmed gap]
     Recheck --> AlreadyFixed{Already fixed upstream?}
     AlreadyFixed -->|Yes| UpstreamFixed[Stop with already_fixed_upstream]
@@ -72,13 +72,19 @@ flowchart TD
     CleanPatch -->|No| Blocker[Stop and report blocker]
     Blocker --> Done
     CleanPatch -->|Yes| Commit[Commit documentation fix]
-    Commit --> Publish[Push branch]
-    Publish --> Provider{Hosting provider}
+    Commit --> Publish[Reconcile remote branch SHA and push if absent]
+    Publish --> ReviewQuery{Exact open review exists?}
+    ReviewQuery -->|Query failed| Blocker
+    ReviewQuery -->|Yes| Cleanup[Remove confirmed clean worktree]
+    ReviewQuery -->|No| Provider{Hosting provider}
     Provider -->|GitHub| OpenPR[Open pull request with gh]
     Provider -->|GitLab| OpenMR[Open merge request with glab]
     Provider -->|Ambiguous| Blocker
-    OpenPR --> Done
-    OpenMR --> Done
+    OpenPR --> ConfirmReview[Query exact review again]
+    OpenMR --> ConfirmReview
+    ConfirmReview -->|Confirmed| Cleanup
+    ConfirmReview -->|Unknown| Blocker
+    Cleanup --> Done
 ```
 
 ## What It Does

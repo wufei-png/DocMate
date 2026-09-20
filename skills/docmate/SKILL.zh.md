@@ -65,6 +65,7 @@ Affected docs: <candidate doc files>
 Suggested fix: <smallest doc-only change>
 Repair scope:
   Docs to modify: <exact doc source files or none>
+  Publication target: <provider; project; push remote/URL; base ref/SHA; default relation, or n/a>
   Actions: <edit; commit; push; open PR/MR, or report only>
   Authorization: <pending | full scope confirmed | local edit only | auto policy | off>
 Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
@@ -92,7 +93,9 @@ Blockers: <missing auth, ambiguous target docs, ambiguous remote, or none>
 4. 在新 worktree 中重新核对源文档与缺口，确保每个目标是仓库内的文档源路径，不是符号链接或来源不明的生成输出。若缺口已修复，返回 `already_fixed_upstream` 并安全移除 clean worktree。
 5. 做最小的纯文档改动。若 GitLab CI 或脚本生成文档，编辑已知生成源文件；源与输出关系不明时停止 `auto`。
 6. 检查 `git status --short --untracked-files=all` 和 `git diff`，只暂存明确目标的文档源路径，再检查 `git diff --cached` 和 `git diff --cached --check`。代码或无关文件变化时停止并报告 blocker。只有完整发布授权或有效 `auto` 策略才提交。
-7. 提交后才进入远端对账与发布。无 patch 的 clean worktree 或已确认发布成功的 clean worktree 可用 `git worktree remove` 移除。有未提交 patch、已提交未推送或远端结果不明时保留 worktree，报告绝对路径、分支、已有 commit 和恢复办法。不要用文件系统删除 worktree，也不要丢弃其中内容。
+7. 恢复时先复用已知修复 worktree 和分支，对账前不要新建第二份修复。发布前重新查询远端 base；若已偏离记录的 base SHA，停止并按新 base 重新判断缺口。push 前用 `git ls-remote --exit-code` 查询已核实 push URL 上的精确分支 ref。返回 0 且 SHA 与本地提交相同表示已推送；返回 2 表示不存在，可向该 remote/ref 正常显式 push。SHA 不同、响应异常或其他退出状态均阻止发布。绝不 force push。push 后再次查询并要求 SHA 与本地一致；结果不明则停止发布并保留 worktree。
+8. 创建 review 前在明确的目标项目中查询 open GitHub PR 或 GitLab MR，以 head/source branch 和 base/target branch 过滤，并核对返回的项目及源 owner，确认分页未遗漏匹配项。精确匹配即为已有 review；查询失败或不完整不等于空结果。只有成功且完整的查询确认无匹配时才创建。GitHub 使用 `gh pr create --repo <project> --head <branch> --base <base>` 并明确 title/body，避免 CLI 隐式 fork 或 push。GitLab 使用 `glab mr create --repo <project> --source-branch <branch> --target-branch <base> --title ... --description ... --yes`，不用 `--fill`、`--push` 或 `--create-source-branch`，且源分支须已确认推送。源与目标项目映射不明时停止。
+9. create 成功或返回不确定错误后，都再次查询同一个精确 open review。确认存在则报告 URL；查询失败或无精确匹配时保留分支、worktree、commit 和命令结果，不盲目重试 create。尚无修复提交的 clean worktree 或已确认发布成功的 clean worktree 可用 `git worktree remove` 移除。有未提交 patch、已提交未推送或远端结果不明时保留 worktree，报告绝对路径、分支、已有 commit 和恢复办法。不要用文件系统删除 worktree，也不要丢弃其中内容。
 
 ## 安全规则
 

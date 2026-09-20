@@ -28,16 +28,18 @@ The safe path is:
 8. Apply the smallest doc-only fix.
 9. Review all changed files, including untracked files, and stage only the
    approved documentation source paths. Inspect the staged diff.
-10. Commit, reconcile remote branch and review state, then push and open a
-    GitHub PR or GitLab MR with native git tooling.
+10. Commit, reconcile the remote branch and push if absent, then query review
+    state before opening a GitHub PR or GitLab MR with native tooling.
 
 ## Authorization and previews
 
-The gap report must name the exact documentation source files that would change
-and list whether the proposed scope includes edit, commit, push, and opening a
-PR or MR. In `ask` mode, one explicit current-user confirmation of that complete
-listed scope authorizes it once; do not ask again before carrying out those
-listed steps. A narrower authorization for local editing permits only that edit
+The gap report must name the exact documentation source files that would change,
+the verified publication target (provider, project, push remote, base ref/SHA,
+and relation to the remote default), and whether the proposed scope includes
+edit, commit, push, and opening a PR or MR. In `ask` mode, one explicit
+current-user confirmation of that complete listed scope authorizes it once;
+do not ask again before carrying out those listed steps. A narrower
+authorization for local editing permits only that edit
 in the isolated worktree and local diff review: stop before staging, committing,
 pushing, or opening a PR/MR.
 
@@ -110,11 +112,92 @@ Only a full-scope `ask` authorization or qualifying `auto` policy permits the
 staging and commit lines. Local-edit-only authorization stops after the local
 diff and keeps the worktree for the user's review.
 
-Remove a worktree with `git worktree remove <path>` only when it is clean and
-has no patch, or after publication is confirmed. If a patch is uncommitted, a
+Remove a worktree with `git worktree remove <path>` only when it is clean before
+any repair commit, or after publication is confirmed. If a patch is uncommitted, a
 commit is unpushed, or the remote outcome is uncertain, keep the worktree and
 report its absolute path, branch, commit if any, and the next command or check
 needed to resume. Use `git worktree` for removal; do not delete its directory
 directly. A failed setup may leave an empty temporary directory, which can be
 removed with `rmdir` only after confirming Git did not register it. Never
 clean, reset, or stash the user's main worktree.
+
+## Remote reconciliation and review creation
+
+Recover a known repair from its existing worktree and branch. Do not start a
+new branch or repeat the edit before reconciling the known commit. Requery the
+remote base immediately before publication; if its SHA changed from the
+recorded `base_sha`, stop and reassess the target gap against the new base. Use
+the same verified push URL, project, base, and local commit recorded for the
+repair. Source and target
+projects must map unambiguously to that URL; stop if a fork or project mapping
+cannot be confirmed. A preview has already stopped before this section.
+
+Before push, query the exact remote branch with `git ls-remote --exit-code`.
+Treat exit 0 plus the exact local SHA as already pushed. Exit 2 means no
+matching branch and permits an ordinary explicit push. A different SHA,
+malformed output, or any other exit status means stop; do not force push. After
+push, query again and require the exact local SHA before touching the review
+provider. For example, with the verified variables above:
+
+```bash
+local_sha="$(git -C "$worktree" rev-parse HEAD)"
+remote_ref="refs/heads/$branch"
+remote_line="$(git ls-remote --exit-code "$push_url" "$remote_ref")"
+remote_status=$?
+case "$remote_status" in
+  0)
+    test "$remote_line" = "$local_sha$(printf '\t')$remote_ref" || exit 1
+    ;;
+  2)
+    git -C "$worktree" push "$push_url" "HEAD:$remote_ref" || exit 1
+    test "$(git ls-remote --exit-code "$push_url" "$remote_ref")" = \
+      "$local_sha$(printf '\t')$remote_ref" || exit 1
+    ;;
+  *) exit 1 ;; # Query failure is not evidence of absence.
+esac
+```
+
+Then query open reviews in the explicit project before create. These commands
+use flags verified against the installed `gh` and `glab` help. Inspect the
+returned JSON, not just the exit status: require exact branch/base and source
+project or owner identity, and make sure the result is complete. If a page is
+full or identities are missing, paginate or use a more precise provider query;
+stop if completeness cannot be established.
+
+```bash
+# GitHub: --head on list filters by branch name, not owner:branch.
+gh pr list --repo "$project" --state open --head "$branch" \
+  --base "$base_branch" --limit 100 \
+  --json number,url,headRefName,baseRefName,headRepositoryOwner,headRepository
+
+# GitLab:
+glab mr list --repo "$project" --source-branch "$branch" \
+  --target-branch "$base_branch" --per-page 100 --output json
+```
+
+If the query fails, stop. If an exact open review exists, report its URL and
+skip create. Only a successful, complete query with no exact match permits
+create. Verify the remote branch still has `local_sha` immediately before
+create. Provide a prepared title and description with evidence, and specify
+all routing flags. Choose the command for the verified provider:
+
+```bash
+# GitHub: --head skips the CLI's implicit fork/push prompt.
+gh pr create --repo "$project" --base "$base_branch" --head "$branch" \
+  --title "$review_title" --body-file "$review_body_file"
+
+# GitLab: do not add --fill, --push, or --create-source-branch.
+glab mr create --repo "$project" --source-branch "$branch" \
+  --target-branch "$base_branch" --title "$review_title" \
+  --description-file "$review_body_file" --yes
+```
+
+Run the same open-review query again even if create exits nonzero or returns a
+URL. A create error can occur after the remote review is created. If the exact
+review is visible, report its URL; if query fails or has no exact match, keep
+the worktree and branch and report the local commit, push SHA, create output,
+and next reconciliation query. Do not blindly retry create. Only after the
+review and remote commit are confirmed may a clean worktree be removed with
+`git worktree remove`; keeping the local branch makes the published repair
+traceable. This command sequence recognizes known retries but does not promise
+machine-level exactly-once publication.
