@@ -145,6 +145,7 @@ def test_repair_publication_requires_reconciliation_in_all_templates():
         "a failed or incomplete query is not an empty result",
         "gh pr create --repo <project> --head <branch> --base <base>",
         "glab mr create --repo <project> --source-branch <branch> --target-branch <base>",
+        "stop and report a blocker for a fork",
         "Query the same exact open review after create",
         "do not blindly retry create",
     ):
@@ -156,6 +157,7 @@ def test_repair_publication_requires_reconciliation_in_all_templates():
         "查询失败或不完整不等于空结果",
         "gh pr create --repo <project> --head <branch> --base <base>",
         "glab mr create --repo <project> --source-branch <branch> --target-branch <base>",
+        "遇到 fork 或项目映射不明时停止",
         "create 成功或返回不确定错误后，都再次查询",
         "不盲目重试 create",
     ):

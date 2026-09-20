@@ -61,8 +61,9 @@ write, identify the selected docs repository and exact source files, confirm
 the authorized actions, and select one explicit push remote and project. Read
 `git remote -v` and `git remote get-url --push <remote>`; never choose the first
 remote by list order. A push URL can differ from the fetch URL, so check the
-actual push target and hosting provider. If the remote, project, or provider is
-ambiguous, stop.
+actual push target and hosting provider. Require its project identity to match
+the target PR/MR project. Stop for forks or any ambiguous project/remote mapping;
+this procedure publishes only within one project.
 
 `repos[].baseBranchCandidates` contains hints. The installer can seed a local
 HEAD name or fallback `main`, so query the chosen remote now. For each
@@ -128,9 +129,9 @@ new branch or repeat the edit before reconciling the known commit. Requery the
 remote base immediately before publication; if its SHA changed from the
 recorded `base_sha`, stop and reassess the target gap against the new base. Use
 the same verified push URL, project, base, and local commit recorded for the
-repair. Source and target
-projects must map unambiguously to that URL; stop if a fork or project mapping
-cannot be confirmed. A preview has already stopped before this section.
+repair. Source and target projects must be the same verified project; stop for
+a fork even when its mapping is known. A preview has already stopped before
+this section.
 
 Before push, query the exact remote branch with `git ls-remote --exit-code`.
 Treat exit 0 plus the exact local SHA as already pushed. Exit 2 means no
