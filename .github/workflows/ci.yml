@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    name: pytest (Python 3.11, Node 24.22.3)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # Keep the suite offline: the installer must copy repo-local skill and
+      # catalog files instead of downloading them from raw.githubusercontent.com.
+      DOCMATE_USE_LOCAL_CACHE: "true"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.11"
+
+      # Node is required by scripts/validate_catalog.sh and tests/test_installer.py;
+      # these tests fail rather than silently skip when node is missing. No npm
+      # dependencies are installed because the validator uses Node built-ins only.
+      - name: Set up Node.js 24.22.3
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: "24.22.3"
+
+      - name: Install pinned pytest
+        run: |
+          python3 -m pip install --disable-pip-version-check --no-input pytest==9.2.0
+          python3 --version
+          python3 -c 'import sys; assert sys.version_info[:2] == (3, 11), sys.version_info'
+          node --version
+          python3 -m pytest --version
+
+      # The suite must never read or write the runner user's real catalog. Every
+      # installer test also passes its own HOME to the installer; this step makes
+      # the whole pytest process use a throwaway HOME and temp directory.
+      - name: Run test suite with an isolated HOME
+        run: |
+          export HOME="$RUNNER_TEMP/docmate-home"
+          export TMPDIR="$RUNNER_TEMP/docmate-tmp"
+          mkdir -p "$HOME" "$TMPDIR"
+          python3 -m pytest -q
