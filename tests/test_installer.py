@@ -49,6 +49,7 @@ def run_install_args(
     node_wrapper.write_text(f"#!/usr/bin/env bash\nexec {node_executable} \"$@\"\n")
     node_wrapper.chmod(0o755)
     env["HOME"] = str(home)
+    (home / "tmp").mkdir(exist_ok=True)
     env["TMPDIR"] = str(home / "tmp")
     env.pop("XDG_STATE_HOME", None)
     if extra_env:
