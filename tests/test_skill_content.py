@@ -40,9 +40,15 @@ def test_skill_templates_preserve_evidence_and_auto_boundary():
 
     assert primary == english
     assert "`docs-only ok` answer must not run Git/version checks." in english
+    english_code_check = next(line for line in english.splitlines() if line.startswith("| `must verify code` |"))
+    assert "bounded search to read the relevant definition" in english_code_check
+    assert "at least one code path that uses, consumes, or merges it" in english_code_check
     assert "cannot by themselves enable `auto` publication" in english
     assert "source-to-output generation relationship is unknown,\nstop `auto`" in english
     assert "`docs-only ok` 的回答不得执行 Git/版本核验" in chinese
+    chinese_code_check = next(line for line in chinese.splitlines() if line.startswith("| `must verify code` |"))
+    assert "限定检索范围，读取相关定义" in chinese_code_check
+    assert "至少一个实际使用、消费或合并路径" in chinese_code_check
     assert "不能单独启用 `auto` 发布" in chinese
     assert "生成源到输出的关系不明时，停止 `auto`" in chinese
     assert "One explicit current-user confirmation of its full listed scope" in english
